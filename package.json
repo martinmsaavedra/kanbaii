@@ -1,0 +1,49 @@
+{
+  "name": "kanbaii",
+  "version": "0.1.0",
+  "description": "AI-native kanban board for software development. Hierarchical project management with Claude AI integration.",
+  "keywords": ["kanban", "claude", "ai", "task-management", "project-management", "cli", "dashboard", "automation", "agent", "anthropic"],
+  "license": "MIT",
+  "author": "Martin Saavedra",
+  "bin": {
+    "kanbaii": "./dist/cli/index.js"
+  },
+  "main": "./dist/server/index.js",
+  "files": [
+    "dist/",
+    "dashboard/"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev:server": "tsx watch src/server/index.ts",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:frontend\"",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:cli": "tsc -p tsconfig.cli.json",
+    "build:frontend": "cd frontend && npm ci && npm run build && node -e \"const fs=require('fs');fs.rmSync('../dashboard',{recursive:true,force:true});fs.cpSync('out','../dashboard',{recursive:true});\"",
+    "build": "npm run build:server && npm run build:cli && npm run build:frontend",
+    "start": "node dist/server/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "chokidar": "^3.6.0",
+    "commander": "^12.1.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "socket.io": "^4.7.5",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.19.33",
+    "concurrently": "^8.2.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3",
+    "vitest": "^1.6.0"
+  }
+}

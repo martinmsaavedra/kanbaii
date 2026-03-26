@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build output
+dist/
+dashboard/
+frontend/.next/
+frontend/out/
+
+# Runtime data
+data/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Config (user-specific)
+config.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
