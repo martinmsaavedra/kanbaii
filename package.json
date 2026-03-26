@@ -5,6 +5,14 @@
   "keywords": ["kanban", "claude", "ai", "task-management", "project-management", "cli", "dashboard", "automation", "agent", "anthropic"],
   "license": "MIT",
   "author": "Martin Saavedra",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/martinmsaavedra/kanbaii.git"
+  },
+  "homepage": "https://github.com/martinmsaavedra/kanbaii#readme",
+  "bugs": {
+    "url": "https://github.com/martinmsaavedra/kanbaii/issues"
+  },
   "bin": {
     "kanbaii": "./dist/cli/index.js"
   },
