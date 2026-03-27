@@ -15,6 +15,16 @@ export interface RalphInputRequest {
   context: string;
 }
 
+export interface EscalationRequest {
+  id: string;
+  source: 'ralph' | 'teams' | 'planner';
+  taskId: string;
+  taskTitle: string;
+  question: string;
+  options: string[];
+  timeoutMs: number;
+}
+
 export interface RalphRun {
   status: RalphStatus;
   runId: string | null;
@@ -65,6 +75,42 @@ export interface TeamsState {
   inputNeeded: TeamsInputRequest | null;
 }
 
+export interface PlannerTask {
+  title: string;
+  description: string;
+  model: string;
+  priority: string;
+  tags: string[];
+}
+
+export interface PlannerDiscoveredItem {
+  id: string;
+  title: string;
+  category: 'feature' | 'bug' | 'refactor';
+  status: 'identified' | 'planning' | 'ready';
+  plan: string | null;
+  tasks: PlannerTask[];
+  approvedAs: string | null;
+}
+
+export interface PlannerMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system' | 'escalation';
+  content: string;
+  options?: string[];
+  respondedWith?: string;
+  timestamp: string;
+}
+
+export interface PlannerState {
+  active: boolean;
+  projectSlug: string | null;
+  messages: PlannerMessage[];
+  discoveredItems: PlannerDiscoveredItem[];
+  escalation: EscalationRequest | null;
+  escalationMessageId: string | null;
+}
+
 const IDLE_RALPH: RalphRun = {
   status: 'idle', runId: null, projectSlug: null, workItemSlug: null,
   currentTaskId: null, currentTaskTitle: null, inputNeeded: null,
@@ -74,6 +120,11 @@ const IDLE_RALPH: RalphRun = {
 
 const IDLE_TEAMS: TeamsState = {
   active: false, projectSlug: null, workers: [], metrics: null, logs: [], inputNeeded: null,
+};
+
+const IDLE_PLANNER: PlannerState = {
+  active: false, projectSlug: null, messages: [], discoveredItems: [],
+  escalation: null, escalationMessageId: null,
 };
 
 interface AppStore {
@@ -106,6 +157,23 @@ interface AppStore {
   appendTerminalOutput: (text: string) => void;
   setTerminalStatus: (status: string) => void;
   resetTerminal: () => void;
+
+  // --- Escalation (SSOT) ---
+  escalation: EscalationRequest | null;
+  onEscalationCreated: (data: EscalationRequest) => void;
+  onEscalationResponded: () => void;
+  onEscalationTimeout: () => void;
+
+  // --- Planner (SSOT) ---
+  planner: PlannerState;
+  onPlannerStarted: (data: { projectSlug: string }) => void;
+  onPlannerMessage: (data: { id: string; role: string; content: string }) => void;
+  onPlannerItemDiscovered: (data: { id: string; title: string; category: string }) => void;
+  onPlannerItemUpdated: (data: { id: string; status: string; plan?: string; tasks?: PlannerTask[] }) => void;
+  onPlannerEscalation: (data: any) => void;
+  onPlannerEscalationResponded: (response: string) => void;
+  onPlannerItemApproved: (data: { id: string; workItemSlug: string }) => void;
+  onPlannerStopped: () => void;
 
   // --- System ---
   isSystemBusy: () => boolean;
@@ -174,9 +242,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return { teams: { ...s.teams, workers, logs: [...s.teams.logs, `${data.status === 'completed' ? '✓' : '✗'} Task ${data.taskId}`] } };
   }),
   onTeamsMetrics: (data) => set((s) => ({ teams: { ...s.teams, metrics: data } })),
-  onTeamsOutput: (data) => set((s) => ({
-    teams: { ...s.teams, logs: [...s.teams.logs.slice(-300), data.message] },
-  })),
+  onTeamsOutput: (data) => set((s) => {
+    // Prefix with short worker ID for log separation
+    const wShort = data.workerId ? `[${data.workerId.slice(-4)}] ` : '';
+    return { teams: { ...s.teams, logs: [...s.teams.logs.slice(-500), `${wShort}${data.message}`] } };
+  }),
   onTeamsStopped: (data) => set((s) => ({
     teams: { ...s.teams, active: false, inputNeeded: null, logs: [...s.teams.logs, `\n--- ${data.message} ---`] },
   })),
@@ -196,17 +266,101 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setTerminalStatus: (status) => set((s) => ({ terminal: { ...s.terminal, status } })),
   resetTerminal: () => set({ terminal: { status: 'idle', output: [], projectSlug: null } }),
 
+  // --- Escalation ---
+  escalation: null,
+  onEscalationCreated: (data) => set({ escalation: data }),
+  onEscalationResponded: () => set({ escalation: null }),
+  onEscalationTimeout: () => set({ escalation: null }),
+
+  // --- Planner ---
+  planner: { ...IDLE_PLANNER },
+
+  onPlannerStarted: (data) => set({
+    planner: { ...IDLE_PLANNER, active: true, projectSlug: data.projectSlug },
+  }),
+
+  onPlannerMessage: (data) => set((s) => ({
+    planner: {
+      ...s.planner,
+      messages: [...s.planner.messages.slice(-200), {
+        id: data.id,
+        role: data.role as PlannerMessage['role'],
+        content: data.content,
+        timestamp: new Date().toISOString(),
+      }],
+    },
+  })),
+
+  onPlannerItemDiscovered: (data) => set((s) => ({
+    planner: {
+      ...s.planner,
+      discoveredItems: [...s.planner.discoveredItems, {
+        id: data.id,
+        title: data.title,
+        category: data.category as PlannerDiscoveredItem['category'],
+        status: 'identified' as const,
+        plan: null,
+        tasks: [],
+        approvedAs: null,
+      }],
+    },
+  })),
+
+  onPlannerItemUpdated: (data) => set((s) => ({
+    planner: {
+      ...s.planner,
+      discoveredItems: s.planner.discoveredItems.map((item) =>
+        item.id === data.id
+          ? { ...item, status: data.status as PlannerDiscoveredItem['status'], plan: data.plan ?? item.plan, tasks: data.tasks ?? item.tasks }
+          : item
+      ),
+    },
+  })),
+
+  onPlannerEscalation: (data) => set((s) => ({
+    planner: {
+      ...s.planner,
+      escalation: { id: data.id, source: 'planner' as const, taskId: data.taskId, taskTitle: data.taskTitle, question: data.question, options: data.options, timeoutMs: data.timeoutMs },
+      escalationMessageId: data.messageId || null,
+    },
+  })),
+
+  onPlannerEscalationResponded: (response) => set((s) => ({
+    planner: {
+      ...s.planner,
+      escalation: null,
+      escalationMessageId: null,
+      messages: s.planner.messages.map((m) =>
+        m.id === s.planner.escalationMessageId ? { ...m, respondedWith: response } : m
+      ),
+    },
+  })),
+
+  onPlannerItemApproved: (data) => set((s) => ({
+    planner: {
+      ...s.planner,
+      discoveredItems: s.planner.discoveredItems.map((item) =>
+        item.id === data.id ? { ...item, approvedAs: data.workItemSlug } : item
+      ),
+    },
+  })),
+
+  onPlannerStopped: () => set((s) => ({
+    planner: { ...s.planner, active: false, escalation: null, escalationMessageId: null },
+  })),
+
   // --- System ---
   isSystemBusy: () => {
     const s = get();
-    return s.ralph.status === 'running' || s.ralph.status === 'paused' || s.teams.active || s.terminal.status === 'running';
+    return s.ralph.status === 'running' || s.ralph.status === 'paused' || s.teams.active || s.terminal.status === 'running' || s.planner.active;
   },
 
   rehydrate: async () => {
     try {
-      const [ralphRes, teamsRes] = await Promise.all([
+      const [ralphRes, teamsRes, plannerRes] = await Promise.all([
         fetch(`${API}/api/ralph/state`).then((r) => r.json()).catch(() => null),
         fetch(`${API}/api/teams/state`).then((r) => r.json()).catch(() => null),
+        fetch(`${API}/api/planner/state`).then((r) => r.json()).catch(() => null),
       ]);
       if (ralphRes?.ok && ralphRes.data) {
         const d = ralphRes.data;
@@ -221,6 +375,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
       if (teamsRes?.ok && teamsRes.data) {
         set((s) => ({ teams: { ...s.teams, active: teamsRes.data.active } }));
+      }
+      if (plannerRes?.ok && plannerRes.data?.active) {
+        set((s) => ({
+          planner: { ...s.planner, active: true, projectSlug: plannerRes.data.projectSlug, messages: plannerRes.data.messages || [], discoveredItems: plannerRes.data.discoveredItems || [] },
+        }));
       }
     } catch { /* server not ready */ }
   },

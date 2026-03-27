@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 
 // Project-level views (no work item selected)
-export type ProjectView = 'work-items' | 'console' | 'teams' | 'soul';
+export type ProjectView = 'work-items' | 'console' | 'teams' | 'soul' | 'planner';
 
 // Work-item-level views (inside a work item)
 export type WorkItemView = 'board' | 'ralph';
