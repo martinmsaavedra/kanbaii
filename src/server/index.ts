@@ -28,6 +28,8 @@ import costsRoutes from './routes/costs';
 import settingsRoutes from './routes/settings';
 import authRoutes from './routes/auth';
 import voiceRoutes from './routes/voice';
+import escalationRoutes from './routes/escalation';
+import plannerRoutes from './routes/planner';
 import { authMiddleware } from './lib/authMiddleware';
 import { startPolling as startUsagePolling } from './services/claudeUsage';
 import { startSchedulerLoop } from './services/schedulerService';
@@ -77,6 +79,8 @@ export function createApp() {
   app.use('/api/settings', settingsRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/voice', voiceRoutes);
+  app.use('/api/escalation', escalationRoutes);
+  app.use('/api/planner', plannerRoutes);
 
   // Static frontend (production)
   const dashboardDir = path.resolve(__dirname, '..', '..', 'dashboard');
