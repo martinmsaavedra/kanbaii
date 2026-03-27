@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
-import { Sparkles, Square, Play } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Sparkles, Square, Play, MessageCircle, Loader2 } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import { useToastStore } from '@/stores/toastStore';
 import { PlannerChat } from './PlannerChat';
@@ -10,11 +10,28 @@ import { PlannerBoard } from './PlannerBoard';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5555';
 
+const WARMUP_PHASES = [
+  { text: 'Launching Claude Sonnet...', delay: 0 },
+  { text: 'Analyzing your request...', delay: 3000 },
+  { text: 'This is an interactive process — Claude will ask you questions to understand your needs', delay: 7000 },
+  { text: 'Hang tight, first response takes a moment...', delay: 14000 },
+];
+
 function EmptyState({ projectSlug }: { projectSlug: string }) {
   const [prompt, setPrompt] = useState('');
   const [starting, setStarting] = useState(false);
+  const [warmupPhase, setWarmupPhase] = useState(0);
   const addToast = useToastStore((s) => s.addToast);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Progress through warmup phases while starting
+  useEffect(() => {
+    if (!starting) { setWarmupPhase(0); return; }
+    const timers = WARMUP_PHASES.slice(1).map((phase, i) =>
+      setTimeout(() => setWarmupPhase(i + 1), phase.delay)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [starting]);
 
   const handleStart = async () => {
     if (!prompt.trim() || starting) return;
@@ -47,25 +64,47 @@ function EmptyState({ projectSlug }: { projectSlug: string }) {
     <div className="flex flex-col items-center justify-center h-full gap-6 animate-fade-in-up px-8">
       {/* Icon */}
       <div className="relative">
-        <Sparkles size={36} className="text-accent/20 animate-breathe" />
+        <Sparkles size={36} className={`text-accent/20 ${starting ? 'animate-spin' : 'animate-breathe'}`} />
         <div className="absolute inset-0 blur-[20px] bg-accent/5 rounded-full" />
       </div>
 
       {/* Title */}
       <div className="flex flex-col items-center gap-1.5 text-center">
         <h2 className="text-lg font-semibold text-text tracking-tight">AI Planner</h2>
-        <p className="text-body text-text-muted max-w-[400px] leading-relaxed">
-          Describe what you want to build. Claude will discover features, ask questions, and generate plans with tasks.
-        </p>
+        {!starting ? (
+          <p className="text-body text-text-muted max-w-[440px] leading-relaxed">
+            Describe what you want to build. Claude will identify features, ask clarifying questions,
+            and create plans with tasks for each one.
+            <span className="block mt-1.5 text-xxs text-text-muted/50 font-mono">
+              Interactive process — your input will be needed along the way
+            </span>
+          </p>
+        ) : (
+          <div className="flex flex-col items-center gap-3 mt-1">
+            <div className="flex items-center gap-2">
+              <Loader2 size={13} className="text-accent animate-spin" />
+              <span className="text-body text-accent font-medium animate-pulse">
+                {WARMUP_PHASES[warmupPhase].text}
+              </span>
+            </div>
+            {warmupPhase >= 2 && (
+              <div className="flex items-center gap-1.5 text-xxs text-text-muted/40 font-mono animate-fade-in-up">
+                <MessageCircle size={10} />
+                Claude Sonnet will ask you questions one at a time
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Prompt */}
-      <div className="w-full max-w-[520px] flex flex-col gap-3">
+      <div className={`w-full max-w-[520px] flex flex-col gap-3 transition-opacity duration-300 ${starting ? 'opacity-40 pointer-events-none' : ''}`}>
         <textarea
           ref={textareaRef}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={handleKeyDown}
+          disabled={starting}
           placeholder="I need a user authentication system with login, signup, password reset, and OAuth for Google and GitHub..."
           className="w-full min-h-[140px] resize-y rounded-lg border border-border/60 bg-surface/40 px-4 py-3
                      text-body text-text placeholder:text-text-muted/30
@@ -86,17 +125,8 @@ function EmptyState({ projectSlug }: { projectSlug: string }) {
                        hover:enabled:shadow-[0_0_24px_rgba(99,102,241,0.3)] hover:enabled:-translate-y-px
                        disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            {starting ? (
-              <>
-                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Starting...
-              </>
-            ) : (
-              <>
-                <Play size={13} />
-                Start Planning
-              </>
-            )}
+            <Play size={13} />
+            Start Planning
           </button>
         </div>
       </div>
@@ -126,11 +156,15 @@ function ActiveHeader() {
                      after:content-[''] after:absolute after:bottom-0 after:left-[5%] after:right-[5%] after:h-px
                      after:bg-[linear-gradient(90deg,transparent,var(--border-glow),transparent)]">
       <div className="flex items-center gap-2 text-h2 font-semibold">
-        <Sparkles size={16} className="text-accent" />
+        <Sparkles size={16} className={active ? 'text-emerald-400 animate-tab-process' : 'text-accent'} />
         Planner
         {active && (
           <span className="w-[7px] h-[7px] rounded-full bg-success animate-breathe shadow-[0_0_8px_rgba(52,211,153,0.4)]" />
         )}
+        {/* Model badge */}
+        <span className="text-[9px] font-mono text-accent/50 bg-accent/5 px-1.5 py-0.5 rounded border border-accent/10 ml-1">
+          sonnet
+        </span>
       </div>
 
       {/* Stats pills */}
@@ -165,27 +199,26 @@ function ActiveHeader() {
 }
 
 export function PlannerView({ projectSlug }: { projectSlug: string }) {
-  const active = useAppStore((s) => s.planner.active);
-  const messages = useAppStore((s) => s.planner.messages);
-  const escalation = useAppStore((s) => s.planner.escalation);
+  const planner = useAppStore((s) => s.planner);
   const addToast = useToastStore((s) => s.addToast);
 
-  const hasSession = active || messages.length > 0;
+  // Session exists if active OR has messages/items from a previous run
+  const hasSession = planner.active || planner.messages.length > 0 || planner.discoveredItems.length > 0;
 
   const handleRespondToEscalation = useCallback(async (response: string) => {
-    if (!escalation) return;
+    if (!planner.escalation) return;
     try {
       await fetch(`${API}/api/escalation/respond`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: escalation.id, response }),
+        body: JSON.stringify({ id: planner.escalation.id, response }),
       });
       useAppStore.getState().onPlannerEscalationResponded(response);
       addToast('Response sent', 'success');
     } catch {
       addToast('Failed to send response', 'error');
     }
-  }, [escalation, addToast]);
+  }, [planner.escalation, addToast]);
 
   // Empty state — no session started
   if (!hasSession) {

@@ -39,7 +39,8 @@ export function Sidebar() {
 
   const isExpanded = pinned || hovered;
   const terminalStatus = useAppStore((s) => s.terminal.status);
-  const isSystemBusy = ralph.status === 'running' || ralph.status === 'paused' || teams.active || terminalStatus === 'running';
+  const plannerActive = useAppStore((s) => s.planner.active);
+  const isSystemBusy = ralph.status === 'running' || ralph.status === 'paused' || teams.active || terminalStatus === 'running' || plannerActive;
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
