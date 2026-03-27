@@ -137,10 +137,9 @@ function EmptyState({ projectSlug }: { projectSlug: string }) {
 function ActiveHeader() {
   const active = useAppStore((s) => s.planner.active);
   const discoveredItems = useAppStore((s) => s.planner.discoveredItems);
-  const identified = discoveredItems.filter((i) => i.status === 'identified' && !i.approvedAs).length;
-  const planning = discoveredItems.filter((i) => i.status === 'planning' && !i.approvedAs).length;
-  const ready = discoveredItems.filter((i) => i.status === 'ready' && !i.approvedAs).length;
+  const pending = discoveredItems.filter((i) => !i.approvedAs).length;
   const approved = discoveredItems.filter((i) => !!i.approvedAs).length;
+  const total = discoveredItems.length;
 
   const handleStop = async () => {
     await fetch(`${API}/api/planner/stop`, { method: 'POST' });
@@ -152,39 +151,30 @@ function ActiveHeader() {
                      after:content-[''] after:absolute after:bottom-0 after:left-[5%] after:right-[5%] after:h-px
                      after:bg-[linear-gradient(90deg,transparent,var(--border-glow),transparent)]">
       <div className="flex items-center gap-2 text-h2 font-semibold">
-        <Sparkles size={16} className={active ? 'text-emerald-400 animate-tab-process' : 'text-accent'} />
+        <Sparkles size={16} className={active ? 'text-accent animate-tab-process' : 'text-accent'} />
         Planner
         {active && (
-          <span className="w-[7px] h-[7px] rounded-full bg-success animate-breathe shadow-[0_0_8px_rgba(52,211,153,0.4)]" />
+          <span className="w-[7px] h-[7px] rounded-full bg-accent animate-breathe shadow-[0_0_8px_var(--accent-glow)]" />
         )}
-        {/* Model badge */}
-        <span className="text-[9px] font-mono text-amber-400/60 bg-amber-500/5 px-1.5 py-0.5 rounded border border-amber-500/10 ml-1">
+        <span className="text-[9px] font-mono text-text-muted bg-surface px-1.5 py-0.5 rounded border border-border ml-1">
           opus
         </span>
       </div>
 
-      {/* Stats pills */}
-      <div className="flex items-center gap-1.5 ml-2">
-        {identified > 0 && (
-          <span className="text-[9px] font-mono text-text-muted/50 bg-surface px-1.5 py-0.5 rounded">{identified} found</span>
-        )}
-        {planning > 0 && (
-          <span className="text-[9px] font-mono text-accent/70 bg-accent/5 px-1.5 py-0.5 rounded">{planning} planning</span>
-        )}
-        {ready > 0 && (
-          <span className="text-[9px] font-mono text-emerald-400/70 bg-emerald-500/5 px-1.5 py-0.5 rounded">{ready} ready</span>
-        )}
-        {approved > 0 && (
-          <span className="text-[9px] font-mono text-emerald-400/50 bg-emerald-500/5 px-1.5 py-0.5 rounded">&#x2713; {approved}</span>
-        )}
-      </div>
+      {/* Simple counts */}
+      {total > 0 && (
+        <div className="flex items-center gap-2 ml-2 text-[9px] font-mono">
+          {pending > 0 && <span className="text-accent">{pending} pending</span>}
+          {approved > 0 && <span className="text-text-muted">{approved} created</span>}
+        </div>
+      )}
 
       <div className="flex-1" />
 
       {active && (
         <button
           onClick={handleStop}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[rgba(248,113,113,0.2)] text-danger text-label font-semibold rounded-sm
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-danger/20 text-danger text-label font-semibold rounded-sm
                      transition-all duration-150 ease-out-expo hover:bg-danger-dim"
         >
           <Square size={12} /> Stop
