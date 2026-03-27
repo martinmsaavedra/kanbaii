@@ -47,6 +47,20 @@ export function useSocket() {
     socket.on('live:stopped', (data) => app().onTeamsStopped(data));
     socket.on('teams:input-needed' as any, (data: any) => app().onTeamsInputNeeded(data));
 
+    // Escalation events (MCP-based)
+    socket.on('escalation:created' as any, (data: any) => app().onEscalationCreated(data));
+    socket.on('escalation:responded' as any, () => app().onEscalationResponded());
+    socket.on('escalation:timeout' as any, () => app().onEscalationTimeout());
+
+    // Planner events → appStore
+    socket.on('planner:started' as any, (data: any) => app().onPlannerStarted(data));
+    socket.on('planner:message' as any, (data: any) => app().onPlannerMessage(data));
+    socket.on('planner:item-discovered' as any, (data: any) => app().onPlannerItemDiscovered(data));
+    socket.on('planner:item-updated' as any, (data: any) => app().onPlannerItemUpdated(data));
+    socket.on('planner:escalation' as any, (data: any) => app().onPlannerEscalation(data));
+    socket.on('planner:item-approved' as any, (data: any) => app().onPlannerItemApproved(data));
+    socket.on('planner:stopped' as any, () => app().onPlannerStopped());
+
     // Terminal events → appStore
     socket.on('terminal:output' as any, (data: any) => {
       app().appendTerminalOutput(data.text);
