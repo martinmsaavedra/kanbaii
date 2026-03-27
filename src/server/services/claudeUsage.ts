@@ -66,6 +66,7 @@ export function fetchClaudeUsage(): Promise<void> {
   return new Promise((resolve) => {
     const token = readOAuthToken();
     if (!token) {
+      console.warn('[claude-usage] No OAuth token found in ~/.claude/.credentials.json');
       resolve();
       return;
     }
@@ -87,11 +88,15 @@ export function fetchClaudeUsage(): Promise<void> {
         res.on('data', (c: Buffer) => (data += c));
         res.on('end', () => {
           if (res.statusCode === 429) {
-            // Rate limited — don't spam retries, wait for next poll cycle
+            console.warn('[claude-usage] Rate limited (429), waiting for next poll');
             resolve();
             return;
           }
-          if (res.statusCode !== 200) { resolve(); return; }
+          if (res.statusCode !== 200) {
+            console.warn(`[claude-usage] API returned ${res.statusCode}`);
+            resolve();
+            return;
+          }
           try {
             const raw = JSON.parse(data);
             const entries: ClaudeUsageEntry[] = [];
@@ -139,8 +144,8 @@ export function fetchClaudeUsage(): Promise<void> {
       }
     );
 
-    req.on('error', () => resolve());
-    req.setTimeout(10000, () => { req.destroy(); resolve(); });
+    req.on('error', (err) => { console.warn(`[claude-usage] Request error: ${err.message}`); resolve(); });
+    req.setTimeout(15000, () => { console.warn('[claude-usage] Request timeout (15s)'); req.destroy(); resolve(); });
     req.end();
   });
 }

@@ -1,10 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Activity } from 'lucide-react';
+import { Activity, RefreshCw } from 'lucide-react';
 import { getSocket } from '@/lib/socket';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5555';
+const POLL_MS = 60_000;
+const RETRY_MS = 8_000;
+const MAX_RETRIES = 5;
+const CACHE_KEY = 'kanbaii-claude-usage';
+const CACHE_TTL = 5 * 60 * 1000;
 
 interface UsageEntry {
   label: string;
@@ -30,70 +35,81 @@ function glowColor(percent: number): string {
   return 'rgba(99, 102, 241, 0.15)';
 }
 
+function readCache(): UsageData | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as UsageData;
+    if (Date.now() - new Date(parsed.timestamp).getTime() < CACHE_TTL) return parsed;
+  } catch {}
+  return null;
+}
+
+function writeCache(data: UsageData): void {
+  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch {}
+}
+
 export function ClaudeUsageWidget({ isExpanded }: { isExpanded: boolean }) {
-  const [usage, setUsage] = useState<UsageData | null>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = sessionStorage.getItem('kanbaii-claude-usage');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Date.now() - new Date(parsed.timestamp).getTime() < 5 * 60 * 1000) return parsed;
-        }
-      } catch {}
-    }
-    return null;
-  });
-  const [loading, setLoading] = useState(!usage);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [usage, setUsage] = useState<UsageData | null>(readCache);
+  const [error, setError] = useState(false);
+  const retriesRef = useRef(0);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const applyData = useCallback((data: UsageData) => {
+    setUsage(data);
+    setError(false);
+    retriesRef.current = 0;
+    writeCache(data);
+  }, []);
 
   const fetchUsage = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/costs/claude-usage`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(`${API}/api/costs/claude-usage`, { signal: controller.signal });
+      clearTimeout(timeout);
       const json = await res.json();
-      if (json.ok && json.data?.entries) {
-        setUsage(json.data);
-        setLoading(false);
-        sessionStorage.setItem('kanbaii-claude-usage', JSON.stringify(json.data));
+      if (json.ok && json.data?.entries?.length > 0) {
+        applyData(json.data);
+      } else {
+        // API returned but no data — maybe server cache empty, retry
+        retriesRef.current++;
+        if (retriesRef.current >= MAX_RETRIES) setError(true);
       }
-    } catch {}
-  }, []);
+    } catch {
+      retriesRef.current++;
+      if (retriesRef.current >= MAX_RETRIES) setError(true);
+    }
+  }, [applyData]);
 
-  // Initial fetch + polling
+  // Single polling loop: fast retries when no data, slow poll when data exists
   useEffect(() => {
     fetchUsage();
-    const iv = setInterval(fetchUsage, 60000);
-    return () => clearInterval(iv);
-  }, [fetchUsage]);
+    pollRef.current = setInterval(() => {
+      fetchUsage();
+    }, usage ? POLL_MS : RETRY_MS);
 
-  // Retry faster if no data
-  useEffect(() => {
-    if (usage) return;
-    const retry = setInterval(fetchUsage, 5000);
-    timeoutRef.current = setTimeout(() => setLoading(false), 30000);
-    return () => { clearInterval(retry); if (timeoutRef.current) clearTimeout(timeoutRef.current); };
-  }, [usage, fetchUsage]);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [fetchUsage, !!usage]); // re-create interval when usage presence changes
 
-  // Socket.IO real-time updates
+  // Socket.IO push updates
   useEffect(() => {
     const socket = getSocket();
     const handler = (data: UsageData) => {
-      if (data?.entries) {
-        setUsage(data);
-        setLoading(false);
-        sessionStorage.setItem('kanbaii-claude-usage', JSON.stringify(data));
-      }
+      if (data?.entries?.length > 0) applyData(data);
     };
     socket.on('claude-usage' as any, handler);
-    socket.on('connect', fetchUsage);
-    return () => { socket.off('claude-usage' as any, handler); socket.off('connect', fetchUsage); };
-  }, [fetchUsage]);
+    return () => { socket.off('claude-usage' as any, handler); };
+  }, [applyData]);
 
   const maxPercent = usage ? Math.max(...usage.entries.map(e => e.percent), 0) : 0;
 
   // ─── Collapsed: mini vertical bar ───
   if (!isExpanded) {
+    if (!usage) return null; // Don't show anything collapsed if no data
     return (
-      <div className="flex flex-col items-center gap-1 py-1" title={usage ? usage.entries.map(e => `${e.label}: ${e.percent}%`).join('\n') : 'Claude Usage'}>
+      <div className="flex flex-col items-center gap-1 py-1" title={usage.entries.map(e => `${e.label}: ${e.percent}%`).join('\n')}>
         <div className="w-[5px] h-5 rounded-full overflow-hidden flex flex-col-reverse"
              style={{ background: 'rgba(148, 163, 242, 0.06)' }}>
           <div className="w-full rounded-full transition-[height] duration-500"
@@ -107,17 +123,22 @@ export function ClaudeUsageWidget({ isExpanded }: { isExpanded: boolean }) {
   // ─── No data ───
   if (!usage) {
     return (
-      <div className="px-3 py-2 flex flex-col items-center gap-1">
-        <div className="text-[8px] text-text-muted font-mono opacity-40 text-center">
-          {loading ? 'Fetching usage...' : 'Usage unavailable'}
-        </div>
-        {!loading && (
-          <button
-            className="text-[7px] text-accent font-mono opacity-60 hover:opacity-100 transition-opacity"
-            onClick={fetchUsage}
-          >
-            Retry
-          </button>
+      <div className="px-3 py-2 flex items-center justify-center gap-2">
+        {error ? (
+          <>
+            <span className="text-[8px] text-text-muted font-mono opacity-40">Unavailable</span>
+            <button
+              className="text-[8px] text-accent font-mono opacity-60 hover:opacity-100 transition-opacity flex items-center gap-1"
+              onClick={() => { retriesRef.current = 0; setError(false); fetchUsage(); }}
+            >
+              <RefreshCw size={8} /> Retry
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="w-2.5 h-2.5 border border-text-muted/20 border-t-accent/50 rounded-full animate-spin" />
+            <span className="text-[8px] text-text-muted font-mono opacity-40">Loading usage...</span>
+          </>
         )}
       </div>
     );
