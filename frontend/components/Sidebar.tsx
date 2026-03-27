@@ -179,7 +179,8 @@ export function Sidebar() {
               const isActive = projectSlug === project.slug;
               const isRalphRunning = ralph.projectSlug === project.slug && (ralph.status === 'running' || ralph.status === 'paused');
               const isTeamsRunning = teams.active && teams.projectSlug === project.slug;
-              const isRunning = isRalphRunning || isTeamsRunning;
+              const isPlannerRunning = plannerActive && useAppStore.getState().planner.projectSlug === project.slug;
+              const isRunning = isRalphRunning || isTeamsRunning || isPlannerRunning;
               const rgb = hexToRgb(project.color);
 
               return (

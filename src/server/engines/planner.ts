@@ -8,40 +8,42 @@ import { createEscalation, setSourceOverride } from '../services/escalationServi
 let currentRunner: ClaudeRunner | null = null;
 let locked = false;
 
-const PLANNER_SYSTEM_PROMPT = `You are an AI Product Planner for the KANBAII project management system.
+// Disallow tools that slow down the planner (superpowers skills, todo tracking, etc.)
+const PLANNER_DISALLOWED_TOOLS = [
+  'Skill', 'TodoWrite', 'TodoRead', 'ToolSearch',
+  'EnterPlanMode', 'ExitPlanMode',
+  'Agent', 'NotebookEdit',
+];
 
-Your job is to have a conversation with the user to understand what they want to build, then decompose their request into discrete work items (features, bugs, or refactors), each with a plan and tasks.
+const PLANNER_SYSTEM_PROMPT = `You are a fast, focused product planner. Your ONLY job: decompose what the user wants into work items with plans and tasks.
 
-## Your Process
+DO NOT use Skill, TodoWrite, ToolSearch, or any planning/brainstorming tools. DO NOT invoke superpowers. Work directly.
 
-1. UNDERSTAND — Read the user's initial prompt carefully. Identify all distinct features, bugs, or refactors they're describing.
+## How you work
 
-2. DISCOVER — For each item you identify, use send_notification with a JSON payload to register it:
-   {"type":"item:discovered","item":{"id":"disc-1","title":"Feature Name","category":"feature"}}
-   Use incrementing IDs: disc-1, disc-2, etc. Category must be "feature", "bug", or "refactor".
-
-3. CLARIFY — For each item, think about what you need to know to write a good plan. Use escalate_to_human to ask the user ONE question at a time. Focus on:
-   - Technical decisions (JWT vs sessions, SQL vs NoSQL, etc.)
-   - Scope boundaries (what's in, what's out)
-   - Priority and dependencies between items
-   - Integration requirements
-
-4. PLAN — Once you have enough context for an item, first notify it's being planned:
+1. Read the user's request. Identify every distinct feature, bug, or refactor.
+2. For EACH item found, immediately call send_notification:
+   {"type":"item:discovered","item":{"id":"disc-1","title":"Short Name","category":"feature"}}
+3. For each item, ask the user 1-2 key questions via escalate_to_human. Only ask what you NEED to write a good plan. Don't ask obvious things.
+4. Once clear, notify planning started, then deliver the plan + tasks:
    {"type":"item:updated","item":{"id":"disc-1","status":"planning"}}
+   Then:
+   {"type":"item:updated","item":{"id":"disc-1","status":"ready","plan":"## Objective\\n...","tasks":[{"title":"...","description":"...","model":"sonnet","priority":"medium","tags":["backend"]}]}}
+5. Move to the next item. Repeat.
 
-   Then when plan + tasks are ready:
-   {"type":"item:updated","item":{"id":"disc-1","status":"ready","plan":"## Objective\\n...markdown plan...","tasks":[{"title":"Task name","description":"What to do","model":"sonnet","priority":"medium","tags":["backend","api"]}]}}
-
-5. ITERATE — Move to the next item. The user may also add new items or modify existing ones during the conversation.
+## send_notification format
+The message field MUST be valid JSON. Types:
+- item:discovered — register a new item
+- item:updated — change status/plan/tasks
+- status — progress message: {"type":"status","message":"Planning OAuth..."}
 
 ## Rules
-- Ask ONE question at a time via escalate_to_human. Wait for the answer before asking the next.
-- Always identify ALL items first (send all item:discovered notifications) before deep-diving into any single one.
-- Generate 3-8 tasks per work item.
-- Tasks should be concrete and actionable.
-- Each task needs: title, description, model (default "sonnet"), priority ("low"|"medium"|"high"|"urgent"), tags (string array).
-- Use send_notification with type "status" for progress updates: {"type":"status","message":"Moving to plan OAuth Integration"}
-- Plan content should be markdown with: Objective, Approach, Key Decisions, Considerations.`;
+- Be FAST. No unnecessary tool calls. No file exploration unless the user asks.
+- Use send_notification for ALL structured output (items, plans, tasks).
+- Use escalate_to_human for questions. ONE question at a time. Include options when possible.
+- 3-8 tasks per work item. Each task: title, description, model (sonnet), priority, tags[].
+- Plan: markdown with Objective, Approach, Key Decisions.
+- If there's an existing spec/plan in the project, read it and use it — don't re-plan from scratch.`;
 
 export async function startPlanner(projectSlug: string, prompt: string): Promise<void> {
   const project = projectStore.getProject(projectSlug);
@@ -131,11 +133,12 @@ export async function startPlanner(projectSlug: string, prompt: string): Promise
 
   try {
     await runner.run({
-      prompt: `The user wants to build the following:\n\n${prompt}\n\nAnalyze this request and begin the discovery process. Identify all work items, then clarify and plan each one.`,
+      prompt: `USER REQUEST:\n\n${prompt}\n\nIdentify all work items, send item:discovered for each, then clarify and plan. Be fast and direct.`,
       workingDir: project.workingDir,
       model: 'sonnet',
-      maxTurns: 200,
-      timeout: 1800000, // 30 min
+      maxTurns: 100,
+      timeout: 900000, // 15 min
+      disallowedTools: PLANNER_DISALLOWED_TOOLS,
     });
   } catch (err) {
     const msg = plannerStore.addMessage('system', `Error: ${(err as Error).message}`);

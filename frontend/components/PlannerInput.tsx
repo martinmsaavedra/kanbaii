@@ -69,8 +69,8 @@ export function PlannerInput({ onRespondToEscalation }: { onRespondToEscalation:
       </div>
       {!hasEscalation && active && (
         <div className="flex items-center gap-2 mt-2 ml-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-accent animate-breathe" />
-          <span className="text-xxs font-mono text-text-muted/50">Claude is thinking...</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-breathe shadow-[0_0_6px_rgba(52,211,153,0.5)]" />
+          <span className="text-xxs font-mono text-emerald-400/60">Analyzing and planning — will ask when input is needed...</span>
         </div>
       )}
     </div>

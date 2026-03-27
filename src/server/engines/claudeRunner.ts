@@ -9,6 +9,7 @@ export interface RunnerOptions {
   systemPrompt?: string;
   timeout?: number;
   maxTurns?: number;
+  disallowedTools?: string[];
 }
 
 export interface RunnerResult {
@@ -40,7 +41,7 @@ export class ClaudeRunner extends EventEmitter {
       '--dangerously-skip-permissions',
       '--output-format', 'stream-json',
       '--max-turns', maxTurns,
-      '--disallowedTools', 'AskUserQuestion',
+      '--disallowedTools', ['AskUserQuestion', ...(options.disallowedTools || [])].join(','),
     ];
     if (model) args.push('--model', model);
 
