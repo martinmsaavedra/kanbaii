@@ -2,7 +2,18 @@
   "name": "kanbaii",
   "version": "0.1.0",
   "description": "AI-native kanban board for software development. Hierarchical project management with Claude AI integration.",
-  "keywords": ["kanban", "claude", "ai", "task-management", "project-management", "cli", "dashboard", "automation", "agent", "anthropic"],
+  "keywords": [
+    "kanban",
+    "claude",
+    "ai",
+    "task-management",
+    "project-management",
+    "cli",
+    "dashboard",
+    "automation",
+    "agent",
+    "anthropic"
+  ],
   "license": "MIT",
   "author": "Martin Saavedra",
   "repository": {
@@ -42,6 +53,7 @@
     "commander": "^12.1.0",
     "cors": "^2.8.5",
     "express": "^4.21.0",
+    "node-pty": "^1.1.0",
     "socket.io": "^4.7.5",
     "zod": "^3.25.76"
   },

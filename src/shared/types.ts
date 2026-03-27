@@ -26,7 +26,7 @@ export const TASK_COLUMNS: TaskColumnName[] = ['backlog', 'todo', 'in-progress',
 
 export const TASK_COLUMN_LABELS: Record<TaskColumnName, string> = {
   'backlog': 'Backlog',
-  'todo': 'Todo',
+  'todo': 'To Do',
   'in-progress': 'In Progress',
   'review': 'Review',
   'done': 'Done',
@@ -55,6 +55,7 @@ export interface Project {
   title: string;
   description?: string;
   color: string;
+  workingDir?: string;  // Filesystem path where the project code lives
   status: 'active' | 'archived' | 'deleted';
   createdAt: string;
   updatedAt: string;
@@ -96,6 +97,7 @@ export interface Task {
   createdAt: string;
   updatedAt?: string;
   completedAt?: string;
+  previousColumn?: string;  // Column before moving to done — used to restore on uncheck
   output?: string;
   summary?: TaskSummary;
 }
@@ -121,6 +123,12 @@ export interface ServerToClientEvents {
   'ralph:output': (data: { taskId: string; message: string }) => void;
   'ralph:completed': (data: { stats: any; message: string }) => void;
   'ralph:error': (data: { taskId?: string; message?: string }) => void;
+  'live:started': (data: { projectSlug: string; workItemSlugs: string[]; maxWorkers: number }) => void;
+  'live:worker-assigned': (data: { workerId: string; taskId: string; taskTitle: string; agentName: string | null; workItemSlug: string }) => void;
+  'live:worker-completed': (data: { workerId: string; taskId: string; status: 'completed' | 'failed' }) => void;
+  'live:metrics': (data: { activeWorkers: number; totalCompleted: number; totalFailed: number; totalTasks: number }) => void;
+  'live:output': (data: { workerId: string; taskId: string; message: string }) => void;
+  'live:stopped': (data: { message: string }) => void;
 }
 
 export interface ClientToServerEvents {

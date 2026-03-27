@@ -1,0 +1,16 @@
+{
+  "name": "KANBAII",
+  "short_name": "KANBAII",
+  "description": "AI-native kanban board for software development",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0b",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
