@@ -129,6 +129,14 @@ export interface ServerToClientEvents {
   'live:metrics': (data: { activeWorkers: number; totalCompleted: number; totalFailed: number; totalTasks: number }) => void;
   'live:output': (data: { workerId: string; taskId: string; message: string }) => void;
   'live:stopped': (data: { message: string }) => void;
+  'planner:started': (data: { projectSlug: string }) => void;
+  'planner:message': (data: { id: string; role: 'user' | 'assistant' | 'system' | 'escalation'; content: string }) => void;
+  'planner:item-discovered': (data: { id: string; title: string; category: WorkItemCategory }) => void;
+  'planner:item-updated': (data: { id: string; status: 'identified' | 'planning' | 'ready'; plan?: string; tasks?: Array<{ title: string; description: string; model: string; priority: string; tags: string[] }> }) => void;
+  'planner:escalation': (data: { id: string; source: 'planner'; taskId: string; taskTitle: string; question: string; options: string[]; timeoutMs: number }) => void;
+  'planner:item-approved': (data: { id: string; workItemSlug: string }) => void;
+  'planner:stopped': (data: { message: string }) => void;
+  'planner:output': (data: { message: string }) => void;
 }
 
 export interface ClientToServerEvents {
