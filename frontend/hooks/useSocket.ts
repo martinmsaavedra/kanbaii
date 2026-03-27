@@ -54,24 +54,36 @@ export function useSocket() {
 
     // Escalation events (MCP-based)
     socket.on('escalation:created' as any, (data: any) => {
-      app().onEscalationCreated(data);
-      // If source is planner, also set planner-specific escalation for inline chat rendering
+      // Planner escalations are handled inline in planner chat, not via global modal
       if (data.source === 'planner') {
-        app().onPlannerEscalation(data);
+        // Only store the escalation ID so PlannerInput can respond to it
+        app().onPlannerEscalation({
+          id: data.id,
+          source: 'planner',
+          taskId: data.taskId || 'planner',
+          taskTitle: data.taskTitle || 'AI Planner',
+          question: data.question,
+          options: data.options || [],
+          timeoutMs: data.timeoutMs || 1800000,
+        });
+        return; // Don't set global escalation — prevents RalphInputModal from flickering
       }
+      app().onEscalationCreated(data);
     });
     socket.on('escalation:responded' as any, (data: any) => {
-      app().onEscalationResponded();
-      // Also clear planner escalation if it was a planner source (e.g. Telegram response)
       if (app().planner.escalation) {
+        // Planner escalation — clear planner state (works for web + Telegram responses)
         app().onPlannerEscalationResponded(data?.response || 'responded');
+      } else {
+        // Ralph/Teams escalation
+        app().onEscalationResponded();
       }
     });
     socket.on('escalation:timeout' as any, () => {
-      app().onEscalationTimeout();
-      // Also clear planner escalation on timeout
       if (app().planner.escalation) {
         app().onPlannerEscalationResponded('(timed out)');
+      } else {
+        app().onEscalationTimeout();
       }
     });
 
