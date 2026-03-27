@@ -5,9 +5,6 @@ import { Activity, RefreshCw } from 'lucide-react';
 import { getSocket } from '@/lib/socket';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5555';
-const POLL_MS = 60_000;
-const RETRY_MS = 8_000;
-const MAX_RETRIES = 5;
 const CACHE_KEY = 'kanbaii-claude-usage';
 const CACHE_TTL = 5 * 60 * 1000;
 
@@ -23,17 +20,8 @@ interface UsageData {
   timestamp: string;
 }
 
-function barColor(percent: number): string {
-  if (percent >= 80) return '#ef4444';
-  if (percent >= 60) return '#f59e0b';
-  return '#6366f1';
-}
-
-function glowColor(percent: number): string {
-  if (percent >= 80) return 'rgba(239, 68, 68, 0.3)';
-  if (percent >= 60) return 'rgba(245, 158, 11, 0.2)';
-  return 'rgba(99, 102, 241, 0.15)';
-}
+function barColor(p: number) { return p >= 80 ? '#ef4444' : p >= 60 ? '#f59e0b' : '#6366f1'; }
+function glowColor(p: number) { return p >= 80 ? 'rgba(239,68,68,0.3)' : p >= 60 ? 'rgba(245,158,11,0.2)' : 'rgba(99,102,241,0.15)'; }
 
 function readCache(): UsageData | null {
   if (typeof window === 'undefined') return null;
@@ -41,73 +29,88 @@ function readCache(): UsageData | null {
     const raw = sessionStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as UsageData;
-    if (Date.now() - new Date(parsed.timestamp).getTime() < CACHE_TTL) return parsed;
+    if (parsed?.entries?.length > 0 && Date.now() - new Date(parsed.timestamp).getTime() < CACHE_TTL) return parsed;
   } catch {}
   return null;
 }
 
-function writeCache(data: UsageData): void {
-  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch {}
-}
-
 export function ClaudeUsageWidget({ isExpanded }: { isExpanded: boolean }) {
   const [usage, setUsage] = useState<UsageData | null>(readCache);
-  const [error, setError] = useState(false);
-  const retriesRef = useRef(0);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [timedOut, setTimedOut] = useState(false);
+  const mountedRef = useRef(true);
 
   const applyData = useCallback((data: UsageData) => {
+    if (!mountedRef.current) return;
     setUsage(data);
-    setError(false);
-    retriesRef.current = 0;
-    writeCache(data);
+    setTimedOut(false);
+    try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch {}
   }, []);
 
-  const fetchUsage = useCallback(async () => {
+  const fetchOnce = useCallback(async (): Promise<boolean> => {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      const res = await fetch(`${API}/api/costs/claude-usage`, { signal: controller.signal });
-      clearTimeout(timeout);
+      const res = await fetch(`${API}/api/costs/claude-usage`);
       const json = await res.json();
-      if (json.ok && json.data?.entries?.length > 0) {
-        applyData(json.data);
-      } else {
-        // API returned but no data — maybe server cache empty, retry
-        retriesRef.current++;
-        if (retriesRef.current >= MAX_RETRIES) setError(true);
+      // Handle both { ok, data } wrapper and direct response
+      const payload = json?.data || json;
+      if (payload?.entries?.length > 0) {
+        applyData(payload);
+        return true;
       }
-    } catch {
-      retriesRef.current++;
-      if (retriesRef.current >= MAX_RETRIES) setError(true);
-    }
+    } catch {}
+    return false;
   }, [applyData]);
 
-  // Single polling loop: fast retries when no data, slow poll when data exists
   useEffect(() => {
-    fetchUsage();
-    pollRef.current = setInterval(() => {
-      fetchUsage();
-    }, usage ? POLL_MS : RETRY_MS);
+    mountedRef.current = true;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let retryTimer: ReturnType<typeof setInterval> | null = null;
+    let giveUpTimer: ReturnType<typeof setTimeout> | null = null;
 
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [fetchUsage, !!usage]); // re-create interval when usage presence changes
+    // Phase 1: fast retries every 3s until we get data (max 30s)
+    const startFastRetry = () => {
+      retryTimer = setInterval(async () => {
+        const ok = await fetchOnce();
+        if (ok && retryTimer) { clearInterval(retryTimer); retryTimer = null; }
+      }, 3000);
 
-  // Socket.IO push updates
+      giveUpTimer = setTimeout(() => {
+        if (retryTimer) { clearInterval(retryTimer); retryTimer = null; }
+        if (mountedRef.current && !usage) setTimedOut(true);
+      }, 30000);
+    };
+
+    // Phase 2: slow poll every 60s (always runs)
+    pollTimer = setInterval(fetchOnce, 60000);
+
+    // Kick off
+    fetchOnce().then((ok) => {
+      if (!ok) startFastRetry();
+    });
+
+    return () => {
+      mountedRef.current = false;
+      if (pollTimer) clearInterval(pollTimer);
+      if (retryTimer) clearInterval(retryTimer);
+      if (giveUpTimer) clearTimeout(giveUpTimer);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Socket.IO push
   useEffect(() => {
     const socket = getSocket();
-    const handler = (data: UsageData) => {
+    const handler = (data: any) => {
       if (data?.entries?.length > 0) applyData(data);
     };
     socket.on('claude-usage' as any, handler);
+    socket.on('connect', () => { fetchOnce(); });
     return () => { socket.off('claude-usage' as any, handler); };
-  }, [applyData]);
+  }, [applyData, fetchOnce]);
 
   const maxPercent = usage ? Math.max(...usage.entries.map(e => e.percent), 0) : 0;
 
-  // ─── Collapsed: mini vertical bar ───
+  // ─── Collapsed ───
   if (!isExpanded) {
-    if (!usage) return null; // Don't show anything collapsed if no data
+    if (!usage) return null;
     return (
       <div className="flex flex-col items-center gap-1 py-1" title={usage.entries.map(e => `${e.label}: ${e.percent}%`).join('\n')}>
         <div className="w-[5px] h-5 rounded-full overflow-hidden flex flex-col-reverse"
@@ -122,29 +125,28 @@ export function ClaudeUsageWidget({ isExpanded }: { isExpanded: boolean }) {
 
   // ─── No data ───
   if (!usage) {
+    if (timedOut) {
+      return (
+        <div className="px-3 py-2 flex items-center justify-center gap-2">
+          <span className="text-[8px] text-text-muted font-mono opacity-40">Unavailable</span>
+          <button
+            className="text-[8px] text-accent font-mono opacity-60 hover:opacity-100 transition-opacity flex items-center gap-1"
+            onClick={() => { setTimedOut(false); fetchOnce(); }}
+          >
+            <RefreshCw size={8} /> Retry
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="px-3 py-2 flex items-center justify-center gap-2">
-        {error ? (
-          <>
-            <span className="text-[8px] text-text-muted font-mono opacity-40">Unavailable</span>
-            <button
-              className="text-[8px] text-accent font-mono opacity-60 hover:opacity-100 transition-opacity flex items-center gap-1"
-              onClick={() => { retriesRef.current = 0; setError(false); fetchUsage(); }}
-            >
-              <RefreshCw size={8} /> Retry
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="w-2.5 h-2.5 border border-text-muted/20 border-t-accent/50 rounded-full animate-spin" />
-            <span className="text-[8px] text-text-muted font-mono opacity-40">Loading usage...</span>
-          </>
-        )}
+        <div className="w-2.5 h-2.5 border border-text-muted/20 border-t-accent/50 rounded-full animate-spin" />
+        <span className="text-[8px] text-text-muted font-mono opacity-40">Loading usage...</span>
       </div>
     );
   }
 
-  // ─── Expanded: full rate limit bars ───
+  // ─── Expanded ───
   return (
     <div className="px-3 py-2 flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5 mb-0.5">
@@ -153,36 +155,23 @@ export function ClaudeUsageWidget({ isExpanded }: { isExpanded: boolean }) {
           Rate Limits
         </span>
       </div>
-
       {usage.entries.map((entry, i) => {
         const color = barColor(entry.percent);
         const glow = glowColor(entry.percent);
-        const isCritical = entry.percent >= 80;
-
         return (
           <div key={i} className="flex flex-col gap-[3px]">
             <div className="flex justify-between items-baseline">
-              <span className="text-[9px] text-text-muted truncate max-w-[110px] font-mono">
-                {entry.label}
-              </span>
-              <span className={`text-[10px] font-bold font-mono tabular-nums ${isCritical ? 'animate-breathe' : ''}`}
-                    style={{ color }}>
-                {entry.percent}%
-              </span>
+              <span className="text-[9px] text-text-muted truncate max-w-[110px] font-mono">{entry.label}</span>
+              <span className={`text-[10px] font-bold font-mono tabular-nums ${entry.percent >= 80 ? 'animate-breathe' : ''}`}
+                    style={{ color }}>{entry.percent}%</span>
             </div>
-            <div className="w-full h-[3px] rounded-full overflow-hidden"
-                 style={{ background: 'rgba(148, 163, 242, 0.06)' }}>
+            <div className="w-full h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(148,163,242,0.06)' }}>
               <div className="h-full rounded-full transition-[width] duration-700 ease-out"
-                   style={{
-                     width: `${Math.min(entry.percent, 100)}%`,
-                     background: color,
-                     boxShadow: entry.percent > 40 ? `0 0 6px ${glow}` : 'none',
-                   }} />
+                   style={{ width: `${Math.min(entry.percent, 100)}%`, background: color,
+                            boxShadow: entry.percent > 40 ? `0 0 6px ${glow}` : 'none' }} />
             </div>
             {entry.resetsAt && (
-              <span className="text-[7px] text-text-muted font-mono opacity-40">
-                Resets {entry.resetsAt}
-              </span>
+              <span className="text-[7px] text-text-muted font-mono opacity-40">Resets {entry.resetsAt}</span>
             )}
           </div>
         );
