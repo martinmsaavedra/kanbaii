@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useCallback, useRef, useState } from 'react';
-import { ChevronLeft, ChevronDown, Plus, Pencil, Search, Play, Square } from 'lucide-react';
+import { Home, ChevronRight, ChevronDown, Plus, Pencil, Search, Play, Square } from 'lucide-react';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import { useWorkItemStore, WorkItem } from '@/stores/workItemStore';
 import { useRouterStore } from '@/stores/routerStore';
+import { useProjectStore } from '@/stores/projectStore';
 import { useToastStore } from '@/stores/toastStore';
 import { api } from '@/lib/api';
 import { TaskModal } from './TaskModal';
@@ -311,7 +312,8 @@ interface Props {
 }
 
 export function TaskBoard({ projectSlug, wiSlug }: Props) {
-  const goBack = useRouterStore((s) => s.goBack);
+  const { goHome, goToProject } = useRouterStore();
+  const projects = useProjectStore((s) => s.projects);
   const { workItems, fetchWorkItems } = useWorkItemStore();
   const addToast = useToastStore((s) => s.addToast);
   const ralph = useAppStore((s) => s.ralph);
@@ -494,13 +496,22 @@ export function TaskBoard({ projectSlug, wiSlug }: Props) {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-3 border-b border-border shrink-0 bg-bg">
-        <button
-          className="inline-flex items-center gap-1 text-label text-text-muted px-2.5 py-[5px] rounded-sm transition-all duration-150 hover:bg-surface-hover hover:text-text"
-          onClick={goBack}
-        >
-          <ChevronLeft size={16} />
-          Back
-        </button>
+        <nav className="flex items-center gap-1 text-label text-text-muted">
+          <button
+            className="inline-flex items-center gap-1 px-2 py-[5px] rounded-sm transition-all duration-150 hover:bg-surface-hover hover:text-text"
+            onClick={goHome}
+          >
+            <Home size={14} />
+          </button>
+          <ChevronRight size={10} className="text-text-muted/50" />
+          <button
+            className="px-2 py-[5px] rounded-sm transition-all duration-150 hover:bg-surface-hover hover:text-text font-medium truncate max-w-[160px]"
+            onClick={() => goToProject(projectSlug)}
+          >
+            {projects.find((p) => p.slug === projectSlug)?.title ?? projectSlug}
+          </button>
+          <ChevronRight size={10} className="text-text-muted/50" />
+        </nav>
 
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <span className="text-h2 shrink-0" style={{ color: cat.color }}>{cat.icon}</span>

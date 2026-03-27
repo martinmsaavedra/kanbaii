@@ -3,7 +3,6 @@
 import { useState, useCallback } from 'react';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { Sidebar } from './Sidebar';
-import { Breadcrumb } from './Breadcrumb';
 import { ToastContainer } from './Toast';
 import { KeyboardHelp } from './KeyboardHelp';
 import { CommandPalette } from './CommandPalette';
@@ -37,7 +36,6 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         {/* Gradient glow separator */}
         <div className="w-px flex-shrink-0 bg-gradient-to-b from-transparent via-border-glow to-transparent" />
         <main className="flex-1 overflow-hidden flex flex-col surface-gradient">
-          <Breadcrumb />
           {children}
         </main>
       </div>

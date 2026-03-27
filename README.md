@@ -12,120 +12,162 @@
 </h1>
 
 <p align="center">
-  <strong>AI-native project management for developers who ship.</strong>
+  <strong>Your ideas deserve structure. AI gives them momentum.</strong>
   <br />
-  <sub>Hierarchical kanban · Claude AI integration · Zero config · Runs locally</sub>
+  <sub>For creators, founders, students, teams, and anyone with a plan to execute.</sub>
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> ·
-  <a href="#features">Features</a> ·
-  <a href="#how-it-works">How It Works</a> ·
+  <a href="#who-is-it-for">Who Is It For</a> ·
+  <a href="#concepts">Concepts</a> ·
   <a href="#wizard">Wizard</a> ·
   <a href="#ralph--teams">Ralph & Teams</a> ·
-  <a href="#roadmap">Roadmap</a>
+  <a href="#cli">CLI</a>
 </p>
 
 ---
 
-## The Problem
+## What Is KANBAII
 
-You have a feature to build. You open your project management tool. You create 15 flat tasks. By day 3, they're a mess — bugs mixed with features, no hierarchy, no context, no plan. Your AI assistant reads 50K chars of instructions just to know where things stand.
+A local-first project board powered by AI. No accounts, no subscriptions, no cloud. Install it, open it, organize anything — from a product launch to a thesis, from a startup MVP to a home renovation plan.
 
-**Software isn't flat. Your kanban shouldn't be either.**
+KANBAII gives you structure when you need it and an AI that can actually execute work for you.
 
-## The Solution
-
-KANBAII organizes work the way developers actually think:
-
-```
-Project
-  └── Work Items (Features, Bugs, Refactors)
-        ├── Plan (generated or manual)
-        └── Tasks (5-column kanban per work item)
+```bash
+npx kanbaii
 ```
 
-Each work item gets its own board. Each board has its own context. Your AI agents execute with precision because they only see what matters.
+That's it. Opens in your browser.
+
+---
+
+## Who Is It For
+
+**Everyone.** You don't need to be a programmer.
+
+| You are... | KANBAII helps you... |
+|---|---|
+| A **founder** with 10 ideas and no process | Break each idea into clear steps and prioritize |
+| A **student** planning a thesis or project | Turn a vague goal into a structured plan with tasks |
+| A **freelancer** juggling clients | Separate projects, track what's active, what's done |
+| A **developer** building software | Execute tasks with AI agents that write code for you |
+| A **team lead** coordinating work | Run multiple work streams in parallel with Teams |
+| A **creator** launching something | Plan, track, and ship — without spreadsheet chaos |
+
+If you've ever felt overwhelmed by everything you need to do, KANBAII turns that noise into a clear board.
 
 ---
 
 ## Quick Start
 
 ```bash
+# Run instantly (no install needed)
 npx kanbaii
-```
 
-That's it. Opens in your browser. No Docker. No database. No config files. Just JSON on disk.
-
-```bash
 # Or install globally
 npm install -g kanbaii
 kanbaii start
 ```
 
+No Docker. No database. No config files. Just JSON on your machine.
+
 ---
 
-## Features
+## Concepts
 
-### ◈ Hierarchical Kanban
+### The Hierarchy
 
-Two levels of kanban boards:
-
-- **Level 1** — Work Items Board: drag Features, Bugs, and Refactors across `Planning → Active → Review → Done`
-- **Level 2** — Task Board: each work item has its own `Backlog → Todo → In Progress → Review → Done`
-
-### ✦ Three Work Item Types
-
-| Type | Purpose | Color |
-|------|---------|-------|
-| **Feature** | New functionality | Indigo |
-| **Bug** | Fix a defect | Red |
-| **Refactor** | Improve existing code | Amber |
-
-Bugs and Refactors can link to a Feature for shared context.
-
-### ⚡ AI Wizard
-
-Create a work item in seconds:
-
-1. Pick a category (Feature / Bug / Refactor)
-2. Link to an existing feature (optional)
-3. Describe what you need in plain English
-4. Claude generates a plan → you approve
-5. Claude generates tasks from the plan → you approve
-6. Done. Your kanban is populated and ready to execute.
-
-Skip any step. Create everything manually if you prefer. The wizard accelerates — it never blocks.
-
-### 🤖 Ralph — AI Executor
-
-Select a work item. Ralph executes every task in order, respecting dependencies and parallelizing where possible.
+KANBAII organizes work in two levels:
 
 ```
-Ralph picks work item "Auth System"
-  → Reads plan for context
-  → Resolves task dependencies
-  → Executes tasks (parallel where safe)
-  → Moves completed tasks to Review
-  → Reports back with summaries
+Project (your big goal)
+  └── Work Items (the pieces to build)
+        ├── Plan (context, strategy, notes)
+        └── Tasks (concrete steps on a kanban board)
 ```
 
-### 👥 Teams — Multi-Agent Execution
+**Work Items** are the meaningful chunks: a feature to build, a bug to fix, a section to refactor. Each one gets its own 5-column kanban board.
 
-Select multiple work items. The coordinator assigns each to a worker. Workers execute in parallel — one work item per worker.
+### Work Item Types
 
-### 🎯 Zero-Friction UX
+| Type | When to use | Color |
+|------|------------|-------|
+| **Feature** | Something new to create | Indigo |
+| **Bug** | Something broken to fix | Red |
+| **Refactor** | Something existing to improve | Amber |
 
-- Dark theme, minimalist design, fluid animations
-- Drag & drop at both levels
-- Progress bars on every work item card
-- Click to drill in, breadcrumb to navigate back
-- Keyboard shortcuts for power users
-- Real-time updates via WebSocket
+### Two Levels of Kanban
 
-### 📁 JSON Persistence
+- **Level 1 — Work Items Board**: Drag work items across `Planning → Active → Review → Done`
+- **Level 2 — Task Board**: Each work item has its own `Backlog → Todo → In Progress → Review → Done`
 
-No database. No markdown parsing. Clean JSON files on disk, git-friendly:
+Click a work item to enter its board. Breadcrumb to navigate back. Simple.
+
+---
+
+## Wizard
+
+The AI wizard turns a sentence into a structured plan:
+
+1. Pick a type (Feature / Bug / Refactor)
+2. Describe what you need in plain language
+3. AI generates a plan — you review and approve
+4. AI generates tasks from the plan — you review and approve
+5. Your board is populated and ready
+
+Skip any step. Edit anything. The wizard accelerates — it never locks you in.
+
+---
+
+## Ralph & Teams
+
+### Ralph — Single Executor
+
+Select one work item. Ralph handles it end to end:
+
+- Reads the plan for context
+- Resolves task dependencies
+- Executes tasks in order (parallel where safe)
+- Moves completed work to Review
+- Reports back with summaries
+
+**Think of Ralph as a focused assistant** — one work item, full attention.
+
+### Teams — Parallel Execution
+
+Select multiple work items. A coordinator assigns each to a worker. Workers execute simultaneously — one work item per worker.
+
+**Think of Teams as a squad** — multiple work items, all moving at once.
+
+---
+
+## CLI
+
+```bash
+kanbaii start          # Start the server
+kanbaii stop           # Graceful shutdown
+kanbaii status         # Health check
+kanbaii init           # Initialize data directory
+```
+
+### Configuration
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `port` | `5555` | Server port |
+| `dataDir` | `~/.kanbaii/data` | Where project data lives |
+| `openBrowser` | `true` | Auto-open on start |
+
+```bash
+kanbaii init --port 8080 --data ~/my-projects
+```
+
+---
+
+## How Data Works
+
+No database. Clean JSON files on disk, fully git-friendly:
 
 ```
 data/projects/my-project/
@@ -135,42 +177,13 @@ data/projects/my-project/
     bug-login-crash.json
 ```
 
----
-
-## How It Works
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  KANBAII                                                │
-│                                                         │
-│  ┌──────────┐  ┌────────────────────────────────────┐  │
-│  │ Sidebar  │  │  Work Items Board                  │  │
-│  │          │  │                                     │  │
-│  │ Projects │  │  PLANNING    ACTIVE    REVIEW  DONE │  │
-│  │ ● Auth   │  │  ┌──────┐  ┌──────┐                │  │
-│  │ ○ API    │  │  │ feat │  │ feat │                │  │
-│  │ ○ UI     │  │  └──────┘  ├──────┤                │  │
-│  │          │  │            │ bug  │                │  │
-│  │          │  │            └──────┘                │  │
-│  └──────────┘  └────────────────────────────────────┘  │
-│                                                         │
-│  Click a work item → enters its Task Board:            │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  ← Back   ✦ Auth System   ████░░ 5/8            │  │
-│  │                                                   │  │
-│  │  BACKLOG   TODO   IN PROGRESS   REVIEW   DONE    │  │
-│  │  ┌──────┐ ┌────┐ ┌──────────┐ ┌──────┐ ┌─────┐ │  │
-│  │  │ task │ │task│ │   task   │ │ task │ │task │ │  │
-│  │  └──────┘ │    │ └──────────┘ └──────┘ └─────┘ │  │
-│  │           └────┘                                 │  │
-│  └──────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
-```
+Your data stays on your machine. Always.
 
 ---
 
 ## Architecture
+
+For contributors and the curious:
 
 ```
 Express + Socket.IO ──── Single port (default: 5555)
@@ -192,72 +205,20 @@ Express + Socket.IO ──── Single port (default: 5555)
 | Validation | Zod |
 | Testing | Vitest |
 
-**No Docker. No database. No external services.**
-
-Everything runs locally. Your data stays on your machine.
-
----
-
-## Configuration
-
-```bash
-# Initialize with custom settings
-kanbaii init --port 8080 --data ~/my-projects
-
-# Or just run — defaults work great
-kanbaii start
-```
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `port` | `5555` | Server port |
-| `dataDir` | `~/.kanbaii/data` | Where project JSON lives |
-| `openBrowser` | `true` | Auto-open on start |
-
----
-
-## CLI
-
-```bash
-kanbaii start          # Start the server
-kanbaii stop           # Graceful shutdown
-kanbaii status         # Health check
-kanbaii init           # Initialize data directory
-```
-
----
-
-## Roadmap
-
-- [x] Project scaffold & architecture
-- [x] Design system & wireframes
-- [ ] Data layer (JSON stores, Zod validation)
-- [ ] REST API + Socket.IO server
-- [ ] Frontend shell (sidebar, routing, design system)
-- [ ] Work Items Board (4-column kanban)
-- [ ] Task Board (5-column kanban per work item)
-- [ ] AI Wizard (prompt → plan → tasks)
-- [ ] Ralph (single work item executor)
-- [ ] Teams (multi work item coordinator)
-- [ ] Terminal integration
-- [ ] Scheduler
-- [ ] NPM package release
-
 ---
 
 ## Development
 
 ```bash
-# Clone
 git clone https://github.com/martinmsaavedra/kanbaii.git
 cd kanbaii
 
-# Install
 npm install
 cd frontend && npm install && cd ..
 
-# Dev mode (backend + frontend)
-npm run dev
+# Dev mode
+npm run dev:server    # Express on :5555
+npm run dev:frontend  # Next.js on :3000
 
 # Test
 npm test
@@ -270,13 +231,13 @@ npm run build
 
 ## Philosophy
 
-> Ship fast. Stay organized. Let AI handle the grunt work.
+> Structure without ceremony. AI without lock-in. Your data, your machine.
 
-KANBAII is built for developers who:
-- Want structure without ceremony
-- Prefer local tools over SaaS subscriptions
-- Trust AI to execute but want to stay in control
-- Value clean UX as much as clean code
+KANBAII is for anyone who wants to:
+- Turn ideas into action without overthinking the process
+- Stay organized without paying for another SaaS
+- Let AI do the heavy lifting while you stay in control
+- Work locally, own your data, move fast
 
 ---
 

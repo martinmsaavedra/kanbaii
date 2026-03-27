@@ -36,8 +36,8 @@
 
   /* Text — warm whites */
   --text:             #e8e8f0;
-  --text-secondary:   #7c7c8a;
-  --text-muted:       #464654;
+  --text-secondary:   #9898a8;
+  --text-muted:       #5c5c6e;
 
   /* Accent — Electric Indigo */
   --accent:           #6366f1;
@@ -106,8 +106,8 @@
   --border-glow:      rgba(79, 70, 229, 0.08);
 
   --text:             #0f0f18;
-  --text-secondary:   #4a4a58;
-  --text-muted:       #9090a0;
+  --text-secondary:   #3d3d4d;
+  --text-muted:       #6e6e82;
 
   --accent:           #4f46e5;
   --accent-hover:     #4338ca;

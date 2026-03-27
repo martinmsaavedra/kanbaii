@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Users, Play, Square, Zap, Plus, Trash2, X, Sparkles, Settings, Bot, Wrench, Radio } from 'lucide-react';
+import { Users, Play, Square, Zap, Plus, Trash2, X, Sparkles, Settings, Bot, Wrench, Radio, Brain, MessageSquare, ChevronRight, ChevronDown, Terminal } from 'lucide-react';
 import { useWorkItemStore } from '@/stores/workItemStore';
 import { useAppStore } from '@/stores/appStore';
 import { useToastStore } from '@/stores/toastStore';
@@ -16,7 +16,6 @@ interface Agent {
 }
 
 type SidePanel = 'agents' | 'config' | null;
-type RightPanel = 'orchestrator' | 'workers' | 'tools';
 
 export function TeamsView({ projectSlug }: { projectSlug: string }) {
   const { workItems, fetchWorkItems } = useWorkItemStore();
@@ -25,18 +24,27 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
 
   const [selectedWIs, setSelectedWIs] = useState<string[]>([]);
   const [maxWorkers, setMaxWorkers] = useState(3);
+  const [teamsModel, setTeamsModel] = useState('sonnet');
   const [sidePanel, setSidePanel] = useState<SidePanel>(null);
-  const [rightPanel, setRightPanel] = useState<RightPanel>('orchestrator');
   const [agents, setAgents] = useState<Agent[]>([]);
   const [showCreateAgent, setShowCreateAgent] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [expandedWorkerId, setExpandedWorkerId] = useState<string | null>(null);
+  const thinkingRef = useRef<HTMLDivElement>(null);
   const logsRef = useRef<HTMLDivElement>(null);
+  const workerLogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { fetchWorkItems(projectSlug); }, [projectSlug, fetchWorkItems]);
   useEffect(() => { fetchAgents(); }, []);
   useEffect(() => {
+    if (thinkingRef.current) thinkingRef.current.scrollTop = thinkingRef.current.scrollHeight;
+  }, [teams.coordinatorThinking]);
+  useEffect(() => {
     if (logsRef.current) logsRef.current.scrollTop = logsRef.current.scrollHeight;
   }, [teams.logs]);
+  useEffect(() => {
+    if (workerLogRef.current) workerLogRef.current.scrollTop = workerLogRef.current.scrollHeight;
+  }, [expandedWorkerId, teams.workerLogs]);
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -62,7 +70,7 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
     try {
       await fetch(`${API}/api/teams/start`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectSlug, workItemSlugs: selectedWIs, maxWorkers }),
+        body: JSON.stringify({ projectSlug, workItemSlugs: selectedWIs, maxWorkers, model: teamsModel }),
       });
     } catch { addToast('Failed to start', 'error'); }
   };
@@ -80,6 +88,13 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
 
   const activeWorkers = teams.workers.filter((w) => w.status === 'running');
   const completedWorkers = teams.workers.filter((w) => w.status !== 'running');
+  const hasThinking = teams.coordinatorThinking.length > 0;
+  const lastToolCalls = teams.coordinatorToolCalls.slice(-8);
+
+  const statusLabel = teams.coordinatorStatus === 'thinking' ? 'Thinking...'
+    : teams.coordinatorStatus === 'calling-tool' ? 'Calling tool...'
+    : teams.coordinatorStatus === 'waiting' ? 'Waiting...'
+    : teams.active ? 'Active' : 'Idle';
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -159,6 +174,27 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
             </div>
           </div>
 
+          {/* Model */}
+          <div>
+            <div className="text-xxs font-semibold text-text-muted uppercase tracking-[0.1em] font-mono mb-2">Coordinator Model</div>
+            <div className="flex gap-1">
+              {['haiku', 'sonnet', 'opus'].map(m => (
+                <button
+                  key={m}
+                  className={`flex-1 py-1.5 text-xxs font-semibold rounded-sm font-mono tracking-wide uppercase transition-all duration-150
+                    ${teamsModel === m
+                      ? 'text-accent bg-accent-muted border border-accent/20'
+                      : 'text-text-muted border border-border hover:text-text-secondary hover:bg-surface-hover'
+                    }`}
+                  onClick={() => setTeamsModel(m)}
+                  disabled={teams.active}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Metrics */}
           {teams.metrics && (
             <div className="p-3 bg-bg border border-border rounded-md shadow-inset">
@@ -177,102 +213,217 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
           )}
         </div>
 
-        {/* ═══ Center: Worker Pool + Logs ═══ */}
+        {/* ═══ Center: Coordinator Brain (top) + Activity Log (bottom) ═══ */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Sub-tabs: Orchestrator | Workers | Tools */}
-          <div className="flex border-b border-border shrink-0 px-3 bg-bg">
-            {([
-              { key: 'orchestrator' as RightPanel, label: 'Orchestrator', icon: <Radio size={12} /> },
-              { key: 'workers' as RightPanel, label: 'Worker Pool', icon: <Zap size={12} /> },
-              { key: 'tools' as RightPanel, label: 'Tools & MCPs', icon: <Wrench size={12} /> },
-            ]).map(t => (
-              <button
-                key={t.key}
-                className={`flex items-center gap-1.5 px-3 py-2 text-data font-semibold font-mono tracking-wide uppercase border-b-2 transition-all duration-150
-                  ${rightPanel === t.key ? 'text-text border-accent' : 'text-text-muted border-transparent hover:text-text-secondary'}`}
-                onClick={() => setRightPanel(t.key)}
-              >
-                {t.icon} {t.label}
-              </button>
-            ))}
-          </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
-            {/* ─── Orchestrator Logs ─── */}
-            {rightPanel === 'orchestrator' && (
-              <div className="flex flex-col h-full gap-3">
-                <div className="text-xxs font-semibold text-text-muted uppercase tracking-[0.1em] font-mono">Execution Logs</div>
-                <div ref={logsRef} className="flex-1 overflow-y-auto bg-bg border border-border rounded-md p-3 font-mono text-data leading-relaxed text-text-muted shadow-inset">
-                  {teams.logs.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full gap-2 opacity-30">
-                      <Radio size={24} />
-                      <span className="text-label font-mono">Orchestrator logs will appear here...</span>
+          {/* ─── Coordinator Brain (top — main focus) ─── */}
+          <div className="flex-[3] min-h-0 flex flex-col p-4 overflow-hidden border-b border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <Brain size={14} className={teams.active ? 'text-accent animate-breathe' : 'text-text-muted'} />
+              <span className="text-xs font-semibold text-text uppercase tracking-[0.08em] font-mono">Coordinator</span>
+              {teams.active && (
+                <span className={`flex items-center gap-1.5 text-xxs font-mono font-medium ml-2 px-2 py-0.5 rounded-full border
+                  ${teams.coordinatorStatus === 'thinking'
+                    ? 'text-accent bg-accent-muted border-accent/20 animate-breathe'
+                    : teams.coordinatorStatus === 'calling-tool'
+                    ? 'text-warning bg-warning-dim border-warning/20'
+                    : 'text-success bg-success-dim border-success/20 animate-breathe'
+                  }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    teams.coordinatorStatus === 'thinking' ? 'bg-accent' :
+                    teams.coordinatorStatus === 'calling-tool' ? 'bg-warning' : 'bg-success'
+                  }`} />
+                  {statusLabel}
+                </span>
+              )}
+              {activeWorkers.length > 0 && (
+                <span className="text-xxs text-success font-mono font-medium ml-auto">
+                  {activeWorkers.length} worker{activeWorkers.length > 1 ? 's' : ''} active
+                </span>
+              )}
+            </div>
+
+            <div ref={thinkingRef} className="flex-1 overflow-y-auto bg-[#06060a] border border-border rounded-md p-4 font-mono text-[11px] leading-[1.8] shadow-[inset_0_2px_6px_rgba(0,0,0,0.3)]">
+              {!hasThinking && teams.logs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full gap-3 opacity-20">
+                  <Brain size={28} />
+                  <span className="text-xs font-mono text-text-muted">
+                    {teams.active ? 'Coordinator is starting...' : 'Select work items and start Teams'}
+                  </span>
+                  {teams.active && (
+                    <div className="flex gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
-                  ) : (
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Coordinator thinking — primary content */}
+                  {teams.coordinatorThinking.map((text, i) => (
+                    <div key={i} className="text-text-secondary whitespace-pre-wrap break-words py-px">{text}</div>
+                  ))}
+
+                  {/* Tool calls — inline badges */}
+                  {lastToolCalls.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2 mb-1">
+                      {lastToolCalls.map((tc, i) => (
+                        <span key={i} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-mono border
+                          ${tc.tool === 'assign_task' ? 'text-success bg-success-dim border-success/20' :
+                            tc.tool === 'wait_for_completion' ? 'text-accent bg-accent-muted border-accent/20' :
+                            tc.tool === 'check_workers' ? 'text-info bg-[rgba(96,165,250,0.08)] border-info/20' :
+                            tc.tool === 'escalate_to_human' ? 'text-warning bg-warning-dim border-warning/20' :
+                            'text-text-muted bg-pill border-border'
+                          }`}>
+                          <Wrench size={9} />
+                          {tc.tool}
+                          {tc.input?.taskId && <span className="opacity-60">({tc.input.taskId.slice(0, 12)})</span>}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Activity log — secondary */}
+                  {teams.logs.length > 0 && !hasThinking && (
                     teams.logs.map((line, i) => (
-                      <div key={i} className={`whitespace-pre-wrap break-all py-0.5 ${
+                      <div key={i} className={`whitespace-pre-wrap break-all py-px ${
                         line.includes('✓') ? 'text-success' :
                         line.includes('✗') ? 'text-danger' :
-                        line.includes('→') ? 'text-accent' : ''
+                        line.startsWith('🔧') ? 'text-warning' :
+                        line.startsWith('⚡') ? 'text-accent font-semibold' :
+                        line.startsWith('🔔') ? 'text-warning font-semibold' :
+                        line.includes('---') ? 'text-text-muted opacity-40 text-center' :
+                        line.includes('Worker →') ? 'text-accent' : 'text-text-muted'
                       }`}>{line}</div>
                     ))
                   )}
-                </div>
-              </div>
-            )}
 
-            {/* ─── Worker Pool ─── */}
-            {rightPanel === 'workers' && (
-              <div className="flex flex-col gap-4">
-                <div className="text-xxs font-semibold text-text-muted uppercase tracking-[0.1em] font-mono">Active Workers</div>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2">
-                  {Array.from({ length: maxWorkers }).map((_, i) => {
-                    const worker = activeWorkers[i];
-                    return (
-                      <div
-                        key={i}
-                        className={`bg-card border rounded-md px-4 py-5 min-h-[100px] flex flex-col items-center justify-center gap-2 transition-all duration-300 ease-out-expo relative overflow-hidden
-                          before:content-[''] before:absolute before:top-0 before:left-[15%] before:right-[15%] before:h-px before:pointer-events-none
-                          ${worker
-                            ? 'border-accent/20 bg-[rgba(99,102,241,0.03)] shadow-[0_0_20px_rgba(99,102,241,0.12)] before:bg-[linear-gradient(90deg,transparent,rgba(99,102,241,0.12),transparent)]'
-                            : 'border-border before:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.02),transparent)]'
-                          }`}
-                      >
-                        {worker ? (
-                          <>
-                            <Zap size={14} className="text-accent animate-breathe drop-shadow-[0_0_6px_var(--accent-glow)]" />
-                            <div className="text-label font-medium text-text text-center truncate max-w-full">{worker.taskTitle}</div>
-                            <div className="text-xxs text-text-muted font-mono">{worker.agentName || 'Default'}</div>
-                          </>
-                        ) : (
-                          <div className="text-data text-text-muted opacity-30 font-mono tracking-wide">Slot {i + 1}</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                  {teams.active && <span className="inline-block w-[6px] h-[14px] bg-accent animate-blink ml-0.5 mt-1" />}
+                </>
+              )}
+            </div>
+          </div>
 
-                {completedWorkers.length > 0 && (
-                  <>
-                    <div className="text-xxs font-semibold text-text-muted uppercase tracking-[0.1em] font-mono mt-2">Completed</div>
-                    <div className="flex flex-col gap-px">
-                      {completedWorkers.map((w) => (
-                        <div key={w.id} className={`flex items-center gap-1.5 text-label py-1 font-mono ${w.status === 'failed' ? 'text-danger' : 'text-text-secondary'}`}>
-                          <span>{w.status === 'completed' ? '\u2713' : '\u2717'}</span>
-                          <span className="flex-1 truncate">{w.taskTitle}</span>
-                          <span className="text-xxs text-text-muted">{w.agentName || ''}</span>
+          {/* ─── Worker Pool (bottom — compact grid + expandable log drawer) ─── */}
+          <div className={`${expandedWorkerId ? 'flex-[3]' : 'flex-[2]'} min-h-[120px] shrink-0 flex flex-col overflow-hidden p-4 transition-all duration-300 ease-out-expo`}>
+            <div className="flex items-center gap-2 mb-2 shrink-0">
+              <Zap size={12} className={activeWorkers.length > 0 ? 'text-accent animate-breathe' : 'text-text-muted'} />
+              <span className="text-xxs font-semibold text-text-muted uppercase tracking-[0.1em] font-mono">Workers</span>
+              {activeWorkers.length > 0 && (
+                <span className="text-xxs text-success font-mono font-medium ml-auto">{activeWorkers.length} active</span>
+              )}
+              {completedWorkers.length > 0 && (
+                <span className="text-xxs text-text-muted font-mono">{completedWorkers.length} done</span>
+              )}
+            </div>
+
+            {/* Worker cards grid */}
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-1.5 shrink-0">
+              {/* Active worker slots */}
+              {Array.from({ length: maxWorkers }).map((_, i) => {
+                const worker = activeWorkers[i];
+                const isExpanded = worker && expandedWorkerId === worker.id;
+                return (
+                  <div
+                    key={i}
+                    className={`bg-card border rounded-sm px-3 py-3 flex items-center gap-2 transition-all duration-300 ease-out-expo
+                      ${worker
+                        ? `cursor-pointer hover:border-accent/40 hover:shadow-[0_0_16px_rgba(99,102,241,0.12)] ${isExpanded ? 'border-accent/40 bg-[rgba(99,102,241,0.06)] shadow-[0_0_16px_rgba(99,102,241,0.12)] ring-1 ring-accent/20' : 'border-accent/20 bg-[rgba(99,102,241,0.03)] shadow-[0_0_12px_rgba(99,102,241,0.08)]'}`
+                        : 'border-border opacity-30'
+                      }`}
+                    onClick={() => worker && setExpandedWorkerId(isExpanded ? null : worker.id)}
+                  >
+                    {worker ? (
+                      <>
+                        <Zap size={11} className="text-accent animate-breathe shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-medium text-text truncate leading-tight">{worker.taskTitle}</div>
+                          <div className="text-xxs text-text-muted font-mono">{worker.agentName || 'Auto'}</div>
                         </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+                        <Terminal size={10} className={`shrink-0 transition-colors duration-150 ${isExpanded ? 'text-accent' : 'text-text-muted/40'}`} />
+                      </>
+                    ) : (
+                      <span className="text-data text-text-muted font-mono">Slot {i + 1}</span>
+                    )}
+                  </div>
+                );
+              })}
 
-            {/* ─── Tools & MCPs ─── */}
-            {rightPanel === 'tools' && (
-              <ConfigPanel />
-            )}
+              {/* Completed workers — clickable to view final output */}
+              {completedWorkers.map((w) => {
+                const isExpanded = expandedWorkerId === w.id;
+                const hasLogs = (teams.workerLogs[w.id]?.length || 0) > 0;
+                return (
+                  <div
+                    key={w.id}
+                    className={`bg-card border rounded-sm px-3 py-3 flex items-center gap-2 transition-all duration-300 ease-out-expo
+                      ${hasLogs ? 'cursor-pointer hover:border-border-light hover:bg-surface-hover' : ''}
+                      ${isExpanded ? 'border-accent/30 bg-[rgba(99,102,241,0.04)] ring-1 ring-accent/15' : 'border-border'}`}
+                    onClick={() => hasLogs && setExpandedWorkerId(isExpanded ? null : w.id)}
+                  >
+                    <span className={`shrink-0 ${w.status === 'failed' ? 'text-danger' : 'text-success'}`}>
+                      {w.status === 'completed' ? '✓' : '✗'}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs text-text-secondary truncate leading-tight">{w.taskTitle?.slice(0, 30) || w.taskId}</div>
+                      <div className="text-xxs text-text-muted font-mono">{w.agentName || 'Auto'}</div>
+                    </div>
+                    {hasLogs && <Terminal size={10} className={`shrink-0 transition-colors duration-150 ${isExpanded ? 'text-accent' : 'text-text-muted/40'}`} />}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ─── Worker Log Drawer (toggleable) ─── */}
+            {expandedWorkerId && (() => {
+              const w = teams.workers.find((w) => w.id === expandedWorkerId);
+              const wLogs = teams.workerLogs[expandedWorkerId] || [];
+              if (!w) return null;
+              return (
+                <div className="flex-1 min-h-0 mt-2 flex flex-col animate-fade-in-up">
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-[rgba(99,102,241,0.04)] border border-accent/15 rounded-t-md shrink-0">
+                    <Terminal size={12} className="text-accent" />
+                    <span className="text-xxs font-semibold text-text uppercase tracking-[0.08em] font-mono truncate">
+                      {w.taskTitle}
+                    </span>
+                    <span className="text-xxs text-text-muted font-mono">
+                      {w.agentName || 'Auto'}
+                    </span>
+                    {w.status === 'running' && (
+                      <span className="flex items-center gap-1 text-xxs text-accent font-mono animate-breathe">
+                        <span className="w-1.5 h-1.5 rounded-full bg-accent" /> live
+                      </span>
+                    )}
+                    {w.status === 'completed' && <span className="text-xxs text-success font-mono">done</span>}
+                    {w.status === 'failed' && <span className="text-xxs text-danger font-mono">failed</span>}
+                    <div className="flex-1" />
+                    <span className="text-xxs text-text-muted font-mono">{wLogs.length} lines</span>
+                    <button
+                      className="btn-icon !p-0.5 !w-5 !h-5"
+                      onClick={(e) => { e.stopPropagation(); setExpandedWorkerId(null); }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                  <div
+                    ref={workerLogRef}
+                    className="flex-1 overflow-y-auto bg-[#06060a] border border-t-0 border-accent/10 rounded-b-md p-3 font-mono text-[11px] leading-[1.7] shadow-[inset_0_2px_6px_rgba(0,0,0,0.3)]"
+                  >
+                    {wLogs.length === 0 ? (
+                      <div className="flex items-center justify-center h-full opacity-20">
+                        <span className="text-xs text-text-muted font-mono">Waiting for output...</span>
+                      </div>
+                    ) : (
+                      wLogs.map((line, i) => (
+                        <div key={i} className="text-text-secondary whitespace-pre-wrap break-all py-px">{line}</div>
+                      ))
+                    )}
+                    {w.status === 'running' && <span className="inline-block w-[6px] h-[14px] bg-accent animate-blink ml-0.5 mt-1" />}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -339,7 +490,7 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
   );
 }
 
-/* ═══ Create Agent Modal (moved from AgentsView) ═══ */
+/* ═══ Create Agent Modal ═══ */
 function CreateAgentModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const addToast = useToastStore((s) => s.addToast);
   const [name, setName] = useState('');

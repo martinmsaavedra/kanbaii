@@ -3,6 +3,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
+import fs from 'fs';
 
 import { ServerToClientEvents, ClientToServerEvents } from '../shared/types';
 import { setIO } from './lib/typedEmit';
@@ -83,12 +84,19 @@ export function createApp() {
   app.use('/api/planner', plannerRoutes);
 
   // Static frontend (production)
+  // Dashboard path: works in both dev (src/server/) and prod (dist/server/)
   const dashboardDir = path.resolve(__dirname, '..', '..', 'dashboard');
-  app.use(express.static(dashboardDir));
+  const altDashboardDir = path.resolve(process.cwd(), 'dashboard');
+  const effectiveDashboardDir = fs.existsSync(dashboardDir) ? dashboardDir : altDashboardDir;
+
+  app.use(express.static(effectiveDashboardDir));
   app.get('*', (_req, res) => {
-    res.sendFile(path.join(dashboardDir, 'index.html'), (err) => {
-      if (err) res.status(404).json({ ok: false, error: 'Not found' });
-    });
+    const indexPath = path.join(effectiveDashboardDir, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).json({ ok: false, error: 'Dashboard not built. Run: npm run build:frontend' });
+    }
   });
 
   // Socket.IO events

@@ -8,6 +8,7 @@ import { runHook } from '../services/pluginLoader';
 import { appendDailyLog, updateHealth } from '../services/soulStore';
 import { notifyRalphStarted, notifyRalphCompleted } from '../services/telegramService';
 import { recordExecution } from '../services/costTracker';
+import { createEscalation } from '../services/escalationService';
 import path from 'path';
 
 let currentRunner: ClaudeRunner | null = null;
@@ -53,6 +54,10 @@ export async function startRalph(config: RalphConfig): Promise<void> {
     total: todoTasks.length,
     taskIds,
   });
+
+  // Auto-move work item to 'active' if still in 'planning'
+  const wiActivated = workItemStore.activateWorkItemIfNeeded(projectSlug, workItemSlug);
+  if (wiActivated) emit('workItem:updated', { projectSlug, workItem: wiActivated });
 
   // Plugin: preRun hook + Telegram
   await runHook('preRun', { runType: 'ralph', projectSlug });
@@ -108,13 +113,14 @@ export async function startRalph(config: RalphConfig): Promise<void> {
       emit('ralph:output', { taskId: task.id, message: chunk });
     });
 
-    runner.on('input-needed', (context: string) => {
-      emit('ralph:input-needed' as any, {
+    runner.on('escalation', (data: { tool: string; question: string; input: any }) => {
+      console.log(`[ralph] Escalation detected (${data.tool}): ${data.question.slice(0, 80)}`);
+      createEscalation({
+        source: 'ralph',
         taskId: task.id,
         taskTitle: task.title,
-        context,
-        projectSlug,
-        workItemSlug,
+        question: data.question,
+        options: data.input?.options || [],
       });
     });
 
@@ -124,6 +130,7 @@ export async function startRalph(config: RalphConfig): Promise<void> {
         workingDir,
         model: task.model || 'sonnet',
         systemPrompt: skillsPrompt || undefined,
+        maxTurns: 50,
       });
 
       currentRunner = null;
@@ -201,6 +208,10 @@ export async function startRalph(config: RalphConfig): Promise<void> {
     });
   } catch {}
 
+  // Auto-promote work item to 'review' if all tasks are done/review
+  const wiAfterRun = workItemStore.promoteWorkItemIfComplete(projectSlug, workItemSlug);
+  if (wiAfterRun) emit('workItem:updated', { projectSlug, workItem: wiAfterRun });
+
   // Done
   emit('ralph:completed', {
     stats: finalState.stats,
@@ -223,11 +234,7 @@ export function resumeRalph(): void {
   runStore.resume();
 }
 
-export function sendInputToRunner(text: string): void {
-  if (currentRunner) {
-    currentRunner.sendInput(text);
-  }
-}
+// Input handling is now via MCP escalation — no stdin needed
 
 function buildTaskPrompt(project: any, wi: any, task: any): string {
   const lines = [
@@ -240,7 +247,7 @@ function buildTaskPrompt(project: any, wi: any, task: any): string {
     wi.plan?.content ? `- Plan:\n${wi.plan.content}\n` : '',
     `## Instructions`,
     `Implement this task. Write clean, working code. Run tests if applicable.`,
-    `If you encounter issues, fix them. Do not ask for clarification — make reasonable assumptions.`,
+    `If blocked, use escalate_to_human MCP tool (not AskUserQuestion).`,
   ].filter(Boolean);
 
   return lines.join('\n');

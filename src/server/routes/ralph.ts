@@ -45,20 +45,7 @@ router.post('/resume', (_req: Request, res: Response) => {
   res.json({ ok: true, data: { message: 'Resumed' } });
 });
 
-// POST /api/ralph/input — send user input to running Claude process
-router.post('/input', (req: Request, res: Response) => {
-  const { text } = req.body;
-  if (!text) return res.status(400).json({ ok: false, error: 'text required' });
-
-  // Access the current runner via the module
-  const ralph = require('../engines/ralph');
-  if (ralph.sendInputToRunner) {
-    ralph.sendInputToRunner(text);
-    res.json({ ok: true });
-  } else {
-    res.status(409).json({ ok: false, error: 'No active runner' });
-  }
-});
+// Input handling is now via MCP escalation endpoint (/api/escalation/*)
 
 // GET /api/ralph/state
 router.get('/state', (_req: Request, res: Response) => {

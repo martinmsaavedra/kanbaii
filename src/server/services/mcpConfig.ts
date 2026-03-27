@@ -154,23 +154,35 @@ export async function testServer(name: string): Promise<{ ok: boolean; message: 
 
 /**
  * Generate the MCP config JSON that Claude CLI expects for --mcp-config flag.
- * Only includes enabled servers.
+ * @param onlyKanbaii If true, only include the KANBAII escalation server (fast). Default: true.
  */
-export function generateMcpConfigForClaude(): string | null {
-  const servers = listServers().filter((s) => s.enabled);
-  if (servers.length === 0) return null;
-
+export function generateMcpConfigForClaude(onlyKanbaii: boolean = true): string | null {
   const mcpConfig: Record<string, { command: string; args?: string[]; env?: Record<string, string> }> = {};
-  for (const s of servers) {
-    mcpConfig[s.name] = {
-      command: s.command,
-      ...(s.args?.length ? { args: s.args } : {}),
-      ...(s.env && Object.keys(s.env).length ? { env: s.env } : {}),
-    };
+
+  // Always include KANBAII's own MCP server (escalation + notifications)
+  const kanbaiiMcpPath = path.resolve(__dirname, '..', 'mcp', 'kanbaii-mcp-server.js');
+  mcpConfig['kanbaii'] = {
+    command: 'node',
+    args: [kanbaiiMcpPath],
+    env: {
+      KANBAII_PORT: process.env.KANBAII_PORT || '5555',
+      KANBAII_HOST: 'localhost',
+    },
+  };
+
+  // Only add user-configured servers if requested
+  if (!onlyKanbaii) {
+    const servers = listServers().filter((s) => s.enabled);
+    for (const s of servers) {
+      mcpConfig[s.name] = {
+        command: s.command,
+        ...(s.args?.length ? { args: s.args } : {}),
+        ...(s.env && Object.keys(s.env).length ? { env: s.env } : {}),
+      };
+    }
   }
 
-  // Write to temp file and return path
-  const tmpFile = path.join(DATA_DIR, '..', '.mcp-runtime.json');
+  const tmpFile = path.join(DATA_DIR, '..', onlyKanbaii ? '.mcp-runtime-minimal.json' : '.mcp-runtime.json');
   fs.writeFileSync(tmpFile, JSON.stringify({ mcpServers: mcpConfig }, null, 2), 'utf-8');
   return tmpFile;
 }

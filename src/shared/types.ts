@@ -91,7 +91,7 @@ export interface Task {
   model: ClaudeModel;
   priority?: Priority;
   tags?: string[];
-  agent?: string;
+  agent?: string | null;
   depends?: string[];
   due?: string;
   createdAt: string;
@@ -137,6 +137,18 @@ export interface ServerToClientEvents {
   'planner:item-approved': (data: { id: string; workItemSlug: string }) => void;
   'planner:stopped': (data: { message: string }) => void;
   'planner:output': (data: { message: string }) => void;
+  'coordinator:started': (data: { projectSlug: string; total: number; parallelGroups: string[][] }) => void;
+  'coordinator:progress': (data: { status: string; current: number; total: number; currentParallelTaskIds: string[]; stats: any; failedTasks: any[] }) => void;
+  'coordinator:task-assigned': (data: { taskId: string; taskTitle: string; agentName: string; model: string; groupIndex: number }) => void;
+  'coordinator:task-completed': (data: { taskId: string; taskTitle: string; status: string; exitCode?: number; retriesUsed?: number }) => void;
+  'coordinator:task-blocked': (data: { taskId: string; taskTitle: string; blockedBy: string[] }) => void;
+  'coordinator:retry': (data: { taskId: string; taskTitle: string; attempt: number; model: string }) => void;
+  'coordinator:group-started': (data: { groupIndex: number; totalGroups: number; taskIds: string[]; parallel: boolean }) => void;
+  'coordinator:completed': (data: { stats: any; message: string; interrupted?: boolean; failedTasks?: any[] }) => void;
+  'coordinator:error': (data: { message: string }) => void;
+  'coordinator:paused': (data: { current: number; total: number }) => void;
+  'coordinator:thinking': (data: { text: string }) => void;
+  'coordinator:tool_call': (data: { tool: string; input: any }) => void;
 }
 
 export interface ClientToServerEvents {

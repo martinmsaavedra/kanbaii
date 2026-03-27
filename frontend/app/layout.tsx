@@ -4,7 +4,7 @@ import { AppShell } from '@/components/AppShell';
 
 export const metadata: Metadata = {
   title: 'KANBAII',
-  description: 'AI-native kanban board for software development',
+  description: 'Structure for your ideas. AI to move them forward.',
   manifest: '/manifest.json',
   icons: {
     icon: [

@@ -252,6 +252,16 @@ const config: Config = {
           '0%, 100%': { filter: 'drop-shadow(0 0 3px var(--accent))' },
           '50%': { filter: 'drop-shadow(0 0 10px var(--accent))' },
         },
+        'tab-process-pulse': {
+          '0%, 100%': {
+            color: 'rgba(52,211,153,0.7)',
+            filter: 'drop-shadow(0 0 0px rgba(52,211,153,0))',
+          },
+          '50%': {
+            color: 'rgba(52,211,153,1)',
+            filter: 'drop-shadow(0 0 6px rgba(52,211,153,0.4))',
+          },
+        },
       },
       animation: {
         'card-in': 'card-slide-in 250ms cubic-bezier(0.16,1,0.3,1) both',
@@ -278,6 +288,7 @@ const config: Config = {
         'waiting-pulse': 'waiting-pulse 2s ease-in-out infinite',
         'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
         'schedule-pulse': 'schedule-pulse 2s ease-in-out infinite',
+        'tab-process': 'tab-process-pulse 2s ease-in-out infinite',
       },
     },
   },

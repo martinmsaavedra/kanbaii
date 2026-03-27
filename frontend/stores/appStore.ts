@@ -78,6 +78,7 @@ export interface TeamsState {
   workers: TeamsWorker[];
   metrics: TeamsMetrics | null;
   logs: string[];
+  workerLogs: Record<string, string[]>;
   inputNeeded: TeamsInputRequest | null;
   // Coordinator AI state
   coordinatorThinking: string[];
@@ -129,7 +130,7 @@ const IDLE_RALPH: RalphRun = {
 };
 
 const IDLE_TEAMS: TeamsState = {
-  active: false, projectSlug: null, workers: [], metrics: null, logs: [], inputNeeded: null,
+  active: false, projectSlug: null, workers: [], metrics: null, logs: [], workerLogs: {}, inputNeeded: null,
   coordinatorThinking: [], coordinatorToolCalls: [], coordinatorStatus: 'idle',
 };
 
@@ -258,7 +259,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
   onTeamsOutput: (data) => set((s) => {
     // Prefix with short worker ID for log separation
     const wShort = data.workerId ? `[${data.workerId.slice(-4)}] ` : '';
-    return { teams: { ...s.teams, logs: [...s.teams.logs.slice(-500), `${wShort}${data.message}`] } };
+    // Per-worker logs (skip coordinator entries)
+    const wLogs = { ...s.teams.workerLogs };
+    if (data.workerId && data.workerId !== 'coordinator') {
+      const prev = wLogs[data.workerId] || [];
+      wLogs[data.workerId] = [...prev.slice(-1000), data.message];
+    }
+    return { teams: { ...s.teams, logs: [...s.teams.logs.slice(-500), `${wShort}${data.message}`], workerLogs: wLogs } };
   }),
   onTeamsStopped: (data) => set((s) => ({
     teams: { ...s.teams, active: false, inputNeeded: null, logs: [...s.teams.logs, `\n--- ${data.message} ---`] },

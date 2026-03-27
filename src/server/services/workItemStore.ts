@@ -257,7 +257,7 @@ export function moveTask(
     task.completed = true;
     task.completedAt = task.completedAt ?? now;
     task.previousColumn = found.column;  // Save where it came from
-  } else if (found.column === 'done' && dto.toColumn !== 'done') {
+  } else if ((found.column as string) === 'done' && (dto.toColumn as string) !== 'done') {
     task.completed = false;
     task.completedAt = undefined;
     task.previousColumn = undefined;  // Clear after restoring
@@ -284,6 +284,52 @@ export function deleteTask(projectSlug: string, wiIdOrSlug: string, taskId: stri
   wi.updatedAt = new Date().toISOString();
 
   writeWorkItem(projectSlug, wi);
+  return wi;
+}
+
+// --- Auto Work Item Status ---
+
+/**
+ * Move work item to 'active' if it's still in 'planning'.
+ * Called when Ralph or Teams starts processing tasks for this work item.
+ */
+export function activateWorkItemIfNeeded(projectSlug: string, wiIdOrSlug: string): WorkItem | null {
+  const wi = findWorkItemByIdOrSlug(projectSlug, wiIdOrSlug);
+  if (!wi) return null;
+  if (wi.status === 'planning') {
+    wi.status = 'active';
+    wi.updatedAt = new Date().toISOString();
+    writeWorkItem(projectSlug, wi);
+  }
+  return wi;
+}
+
+/**
+ * Check if all tasks in a work item are in 'review' or 'done' columns
+ * (nothing left in backlog, todo, in-progress). If so, move status to 'review'.
+ * Only promotes from 'active' → 'review', never from 'review' or 'done'.
+ */
+export function promoteWorkItemIfComplete(projectSlug: string, wiIdOrSlug: string): WorkItem | null {
+  const wi = findWorkItemByIdOrSlug(projectSlug, wiIdOrSlug);
+  if (!wi) return null;
+  if (wi.status !== 'active') return wi;
+
+  const pendingCount =
+    wi.columns['backlog'].length +
+    wi.columns['todo'].length +
+    wi.columns['in-progress'].length;
+
+  const totalTasks =
+    pendingCount +
+    wi.columns['review'].length +
+    wi.columns['done'].length;
+
+  // Only promote if there are tasks and none are pending
+  if (totalTasks > 0 && pendingCount === 0) {
+    wi.status = 'review';
+    wi.updatedAt = new Date().toISOString();
+    writeWorkItem(projectSlug, wi);
+  }
   return wi;
 }
 
