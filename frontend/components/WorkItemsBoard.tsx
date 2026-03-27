@@ -9,7 +9,6 @@ import { useRouterStore } from '@/stores/routerStore';
 import { api } from '@/lib/api';
 import { CreateWorkItemModal } from './CreateWorkItemModal';
 import { EditWorkItemModal } from './EditWorkItemModal';
-import { WizardModal } from './WizardModal';
 
 const CATEGORIES = {
   feature: { color: '#6366f1', icon: '\u2726', label: 'FEAT' },
@@ -235,10 +234,10 @@ interface Props {
 
 export function WorkItemsBoard({ projectSlug }: Props) {
   const goToWorkItem = useRouterStore((s) => s.goToWorkItem);
+  const setView = useRouterStore((s) => s.setView);
   const { workItems, loading, fetchWorkItems } = useWorkItemStore();
   const project = useProjectStore((s) => s.projects.find((p) => p.slug === projectSlug));
   const [showCreate, setShowCreate] = useState(false);
-  const [showWizard, setShowWizard] = useState(false);
   const [editingWI, setEditingWI] = useState<WorkItem | null>(null);
 
   useEffect(() => {
@@ -321,9 +320,9 @@ export function WorkItemsBoard({ projectSlug }: Props) {
             <Plus size={16} />
             Quick
           </button>
-          <button className="btn-primary" onClick={() => setShowWizard(true)}>
+          <button className="btn-primary" onClick={() => setView('planner')}>
             <Sparkles size={16} />
-            Wizard
+            Planner
           </button>
         </div>
       </div>
@@ -350,12 +349,6 @@ export function WorkItemsBoard({ projectSlug }: Props) {
         />
       )}
 
-      {showWizard && (
-        <WizardModal
-          projectSlug={projectSlug}
-          onClose={() => setShowWizard(false)}
-        />
-      )}
 
       {editingWI && (
         <EditWorkItemModal

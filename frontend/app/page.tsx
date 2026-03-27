@@ -1,28 +1,66 @@
 'use client';
 
+import { ChevronRight, Home as HomeIcon } from 'lucide-react';
 import { useRouterStore } from '@/stores/routerStore';
+import { useProjectStore } from '@/stores/projectStore';
 import { WorkItemsBoard } from '@/components/WorkItemsBoard';
 import { TaskBoard } from '@/components/TaskBoard';
 import { RalphView } from '@/components/RalphView';
 import { TeamsView } from '@/components/TeamsView';
 import { TerminalView } from '@/components/TerminalView';
 import { SoulView } from '@/components/SoulView';
+import { PlannerView } from '@/components/PlannerView';
 import { ViewSwitcher } from '@/components/ViewSwitcher';
+import { WelcomeLanding } from '@/components/WelcomeLanding';
+
+function Breadcrumb() {
+  const { projectSlug, workItemSlug, goHome, goBack } = useRouterStore();
+  const projects = useProjectStore((s) => s.projects);
+
+  const project = projects.find((p) => p.slug === projectSlug);
+
+  return (
+    <nav className="flex items-center gap-1 text-xxs font-mono tracking-wide mr-auto">
+      <button
+        onClick={goHome}
+        className="flex items-center gap-1.5 text-text-muted hover:text-accent transition-colors duration-150 group"
+      >
+        <HomeIcon size={11} className="opacity-50 group-hover:opacity-100 transition-opacity duration-150" />
+        <span className="uppercase tracking-widest">Kanbaii</span>
+      </button>
+
+      {project && (
+        <>
+          <ChevronRight size={10} className="text-text-muted/30" />
+          {workItemSlug ? (
+            <button
+              onClick={goBack}
+              className="text-text-muted hover:text-accent transition-colors duration-150 truncate max-w-[160px]"
+            >
+              {project.title}
+            </button>
+          ) : (
+            <span className="text-text-secondary truncate max-w-[160px]">{project.title}</span>
+          )}
+        </>
+      )}
+
+      {workItemSlug && (
+        <>
+          <ChevronRight size={10} className="text-text-muted/30" />
+          <span className="text-text-secondary truncate max-w-[160px]">{workItemSlug}</span>
+        </>
+      )}
+    </nav>
+  );
+}
 
 export default function Home() {
   const { projectSlug, workItemSlug, view } = useRouterStore();
 
-  // No project selected
+  // No project selected — show landing
   if (!projectSlug) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 text-text-secondary text-center animate-fade-in-up">
-        <span className="text-[44px] text-accent opacity-25">&#x2B21;</span>
-        <h2 className="text-h1 font-semibold text-text tracking-tight">Welcome to KANBAII</h2>
-        <p className="text-body text-text-muted max-w-[360px] leading-relaxed">
-          Select a project from the sidebar or create a new one to get started.
-        </p>
-      </div>
-    );
+    return <WelcomeLanding />;
   }
 
   // ─── Project Level Views ───
@@ -37,6 +75,8 @@ export default function Home() {
           return <TeamsView projectSlug={projectSlug} />;
         case 'soul':
           return <SoulView projectSlug={projectSlug} />;
+        case 'planner':
+          return <PlannerView projectSlug={projectSlug} />;
         default:
           return <WorkItemsBoard projectSlug={projectSlug} />;
       }
@@ -44,7 +84,8 @@ export default function Home() {
 
     return (
       <div className="flex flex-col h-full overflow-hidden">
-        <div className="flex items-center justify-center px-6 py-2 border-b border-border flex-shrink-0 bg-bg">
+        <div className="flex items-center px-4 py-2 border-b border-border flex-shrink-0 bg-bg gap-4">
+          <Breadcrumb />
           <ViewSwitcher />
         </div>
         <div className="flex-1 overflow-hidden">
@@ -68,7 +109,8 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-center px-6 py-2 border-b border-border flex-shrink-0 bg-bg">
+      <div className="flex items-center px-4 py-2 border-b border-border flex-shrink-0 bg-bg gap-4">
+        <Breadcrumb />
         <ViewSwitcher />
       </div>
       <div className="flex-1 overflow-hidden">
