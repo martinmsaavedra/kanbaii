@@ -66,6 +66,12 @@ export interface TeamsInputRequest {
   context: string;
 }
 
+export interface CoordinatorToolCall {
+  tool: string;
+  input: any;
+  timestamp: string;
+}
+
 export interface TeamsState {
   active: boolean;
   projectSlug: string | null;
@@ -73,6 +79,10 @@ export interface TeamsState {
   metrics: TeamsMetrics | null;
   logs: string[];
   inputNeeded: TeamsInputRequest | null;
+  // Coordinator AI state
+  coordinatorThinking: string[];
+  coordinatorToolCalls: CoordinatorToolCall[];
+  coordinatorStatus: 'idle' | 'thinking' | 'calling-tool' | 'waiting';
 }
 
 export interface PlannerTask {
@@ -120,6 +130,7 @@ const IDLE_RALPH: RalphRun = {
 
 const IDLE_TEAMS: TeamsState = {
   active: false, projectSlug: null, workers: [], metrics: null, logs: [], inputNeeded: null,
+  coordinatorThinking: [], coordinatorToolCalls: [], coordinatorStatus: 'idle',
 };
 
 const IDLE_PLANNER: PlannerState = {
@@ -151,6 +162,10 @@ interface AppStore {
   onTeamsStopped: (data: { message: string }) => void;
   onTeamsInputNeeded: (data: TeamsInputRequest) => void;
   clearTeamsInput: () => void;
+  // Coordinator AI events
+  onCoordinatorThinking: (data: { text: string }) => void;
+  onCoordinatorToolCall: (data: { tool: string; input: any }) => void;
+  onCoordinatorCompleted: (data: { stats: any; message: string }) => void;
 
   // --- Terminal (SSOT) ---
   terminal: { status: string; output: string[]; projectSlug: string | null };
@@ -225,11 +240,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   onTeamsStarted: (data) => set({
     teams: {
+      ...IDLE_TEAMS,
       active: true,
       projectSlug: data.projectSlug,
-      workers: [],
-      metrics: null,
-      inputNeeded: null,
       logs: [`Teams started: ${data.workItemSlugs.length} work items, ${data.maxWorkers} workers`],
     },
   }),
@@ -255,6 +268,31 @@ export const useAppStore = create<AppStore>((set, get) => ({
   })),
   clearTeamsInput: () => set((s) => ({
     teams: { ...s.teams, inputNeeded: null },
+  })),
+
+  // Coordinator AI events
+  onCoordinatorThinking: (data) => set((s) => ({
+    teams: {
+      ...s.teams,
+      coordinatorThinking: [...s.teams.coordinatorThinking.slice(-200), data.text],
+      coordinatorStatus: 'thinking',
+    },
+  })),
+  onCoordinatorToolCall: (data) => set((s) => ({
+    teams: {
+      ...s.teams,
+      coordinatorToolCalls: [...s.teams.coordinatorToolCalls.slice(-30), { tool: data.tool, input: data.input, timestamp: new Date().toISOString() }],
+      coordinatorStatus: 'calling-tool',
+      logs: [...s.teams.logs, `🔧 ${data.tool}${data.input?.taskId ? ` → ${data.input.taskId}` : ''}`],
+    },
+  })),
+  onCoordinatorCompleted: (data) => set((s) => ({
+    teams: {
+      ...s.teams,
+      active: false,
+      coordinatorStatus: 'idle',
+      logs: [...s.teams.logs, `\n--- ${data.message} ---`],
+    },
   })),
 
   // --- Terminal ---
