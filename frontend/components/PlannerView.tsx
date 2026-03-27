@@ -136,15 +136,11 @@ function EmptyState({ projectSlug }: { projectSlug: string }) {
 
 function ActiveHeader() {
   const active = useAppStore((s) => s.planner.active);
-  const stats = useAppStore((s) => {
-    const items = s.planner.discoveredItems;
-    return {
-      identified: items.filter((i) => i.status === 'identified' && !i.approvedAs).length,
-      planning: items.filter((i) => i.status === 'planning' && !i.approvedAs).length,
-      ready: items.filter((i) => i.status === 'ready' && !i.approvedAs).length,
-      approved: items.filter((i) => !!i.approvedAs).length,
-    };
-  });
+  const discoveredItems = useAppStore((s) => s.planner.discoveredItems);
+  const identified = discoveredItems.filter((i) => i.status === 'identified' && !i.approvedAs).length;
+  const planning = discoveredItems.filter((i) => i.status === 'planning' && !i.approvedAs).length;
+  const ready = discoveredItems.filter((i) => i.status === 'ready' && !i.approvedAs).length;
+  const approved = discoveredItems.filter((i) => !!i.approvedAs).length;
 
   const handleStop = async () => {
     await fetch(`${API}/api/planner/stop`, { method: 'POST' });
@@ -169,17 +165,17 @@ function ActiveHeader() {
 
       {/* Stats pills */}
       <div className="flex items-center gap-1.5 ml-2">
-        {stats.identified > 0 && (
-          <span className="text-[9px] font-mono text-text-muted/50 bg-surface px-1.5 py-0.5 rounded">{stats.identified} found</span>
+        {identified > 0 && (
+          <span className="text-[9px] font-mono text-text-muted/50 bg-surface px-1.5 py-0.5 rounded">{identified} found</span>
         )}
-        {stats.planning > 0 && (
-          <span className="text-[9px] font-mono text-accent/70 bg-accent/5 px-1.5 py-0.5 rounded">{stats.planning} planning</span>
+        {planning > 0 && (
+          <span className="text-[9px] font-mono text-accent/70 bg-accent/5 px-1.5 py-0.5 rounded">{planning} planning</span>
         )}
-        {stats.ready > 0 && (
-          <span className="text-[9px] font-mono text-emerald-400/70 bg-emerald-500/5 px-1.5 py-0.5 rounded">{stats.ready} ready</span>
+        {ready > 0 && (
+          <span className="text-[9px] font-mono text-emerald-400/70 bg-emerald-500/5 px-1.5 py-0.5 rounded">{ready} ready</span>
         )}
-        {stats.approved > 0 && (
-          <span className="text-[9px] font-mono text-emerald-400/50 bg-emerald-500/5 px-1.5 py-0.5 rounded">&#x2713; {stats.approved}</span>
+        {approved > 0 && (
+          <span className="text-[9px] font-mono text-emerald-400/50 bg-emerald-500/5 px-1.5 py-0.5 rounded">&#x2713; {approved}</span>
         )}
       </div>
 
@@ -199,26 +195,30 @@ function ActiveHeader() {
 }
 
 export function PlannerView({ projectSlug }: { projectSlug: string }) {
-  const planner = useAppStore((s) => s.planner);
+  const active = useAppStore((s) => s.planner.active);
+  const messageCount = useAppStore((s) => s.planner.messages.length);
+  const itemCount = useAppStore((s) => s.planner.discoveredItems.length);
+  const escalationId = useAppStore((s) => s.planner.escalation?.id ?? null);
   const addToast = useToastStore((s) => s.addToast);
 
   // Session exists if active OR has messages/items from a previous run
-  const hasSession = planner.active || planner.messages.length > 0 || planner.discoveredItems.length > 0;
+  const hasSession = active || messageCount > 0 || itemCount > 0;
 
   const handleRespondToEscalation = useCallback(async (response: string) => {
-    if (!planner.escalation) return;
+    const esc = useAppStore.getState().planner.escalation;
+    if (!esc) return;
     try {
       await fetch(`${API}/api/escalation/respond`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: planner.escalation.id, response }),
+        body: JSON.stringify({ id: esc.id, response }),
       });
       useAppStore.getState().onPlannerEscalationResponded(response);
       addToast('Response sent', 'success');
     } catch {
       addToast('Failed to send response', 'error');
     }
-  }, [planner.escalation, addToast]);
+  }, [escalationId, addToast]);
 
   // Empty state — no session started
   if (!hasSession) {
