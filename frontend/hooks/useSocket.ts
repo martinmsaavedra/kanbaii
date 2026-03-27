@@ -47,10 +47,27 @@ export function useSocket() {
     socket.on('live:stopped', (data) => app().onTeamsStopped(data));
     socket.on('teams:input-needed' as any, (data: any) => app().onTeamsInputNeeded(data));
 
+    // Coordinator AI events → appStore
+    socket.on('coordinator:thinking' as any, (data: any) => app().onCoordinatorThinking(data));
+    socket.on('coordinator:tool_call' as any, (data: any) => app().onCoordinatorToolCall(data));
+    socket.on('coordinator:completed' as any, (data: any) => app().onCoordinatorCompleted(data));
+
     // Escalation events (MCP-based)
     socket.on('escalation:created' as any, (data: any) => app().onEscalationCreated(data));
-    socket.on('escalation:responded' as any, () => app().onEscalationResponded());
-    socket.on('escalation:timeout' as any, () => app().onEscalationTimeout());
+    socket.on('escalation:responded' as any, (data: any) => {
+      app().onEscalationResponded();
+      // Also clear planner escalation if it was a planner source (e.g. Telegram response)
+      if (app().planner.escalation) {
+        app().onPlannerEscalationResponded(data?.response || 'responded');
+      }
+    });
+    socket.on('escalation:timeout' as any, () => {
+      app().onEscalationTimeout();
+      // Also clear planner escalation on timeout
+      if (app().planner.escalation) {
+        app().onPlannerEscalationResponded('(timed out)');
+      }
+    });
 
     // Planner events → appStore
     socket.on('planner:started' as any, (data: any) => app().onPlannerStarted(data));

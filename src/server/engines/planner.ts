@@ -59,34 +59,57 @@ export async function startPlanner(projectSlug: string, prompt: string): Promise
 
   // Listen for Claude's text output → chat messages
   let currentAssistantMsg = '';
+
+  const flushAssistantMsg = () => {
+    const text = currentAssistantMsg.trim();
+    if (!text) return;
+    const msg = plannerStore.addMessage('assistant', text);
+    emit('planner:message' as any, { id: msg.id, role: 'assistant', content: text });
+    currentAssistantMsg = '';
+  };
+
   runner.on('output', (chunk: string) => {
-    // Skip notification/escalation echo lines (handled separately)
+    // Skip notification/escalation echo lines (handled separately by tool handler)
     if (chunk.startsWith('📢') || chunk.startsWith('🔔')) return;
     if (chunk.startsWith('⚡') || chunk.startsWith('  →')) {
+      // Flush any pending text before tool output
+      flushAssistantMsg();
       emit('planner:output' as any, { message: chunk });
       return;
     }
 
     currentAssistantMsg += chunk;
-    // Flush on newline boundaries for smoother streaming
-    if (chunk.includes('\n')) {
-      const msg = plannerStore.addMessage('assistant', currentAssistantMsg.trim());
-      emit('planner:message' as any, { id: msg.id, role: 'assistant', content: currentAssistantMsg.trim() });
-      currentAssistantMsg = '';
+    // Flush on any newline for smoother streaming
+    if (chunk.includes('\n') || chunk.length > 200) {
+      flushAssistantMsg();
     }
   });
 
   // Listen for tool calls — parse structured notifications
   runner.on('tool', (data: { tool: string; content: any }) => {
-    if (data.tool === 'send_notification' && data.content?.message) {
+    console.log(`[planner] tool call: ${data.tool}`, JSON.stringify(data.content)?.slice(0, 200));
+
+    if (data.tool === 'send_notification') {
+      const rawMessage = data.content?.message || '';
+      // Try to parse as JSON notification
       try {
-        const payload = JSON.parse(data.content.message);
+        const payload = JSON.parse(rawMessage);
+        console.log(`[planner] notification parsed:`, payload.type);
         handleNotification(payload);
       } catch {
         // Plain text notification — show as system message
-        const msg = plannerStore.addMessage('system', data.content.message);
-        emit('planner:message' as any, { id: msg.id, role: 'system', content: data.content.message });
+        if (rawMessage) {
+          const msg = plannerStore.addMessage('system', rawMessage);
+          emit('planner:message' as any, { id: msg.id, role: 'system', content: rawMessage });
+        }
       }
+    }
+
+    // Also try to detect item patterns in ANY tool call's text output
+    // Claude might embed JSON in its text output instead of using send_notification
+    if (data.tool !== 'send_notification' && data.tool !== 'escalate_to_human') {
+      // Log for debugging
+      console.log(`[planner] non-notification tool: ${data.tool}`);
     }
   });
 
