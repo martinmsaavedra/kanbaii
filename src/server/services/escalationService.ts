@@ -23,6 +23,10 @@ export interface Escalation {
 let escalationQueue: Escalation[] = [];
 let timeoutHandles: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
+// Source override — when planner is active, all escalations get source 'planner'
+let sourceOverride: 'ralph' | 'teams' | 'planner' | null = null;
+export function setSourceOverride(source: 'ralph' | 'teams' | 'planner' | null): void { sourceOverride = source; }
+
 // ─── API ───
 
 export function createEscalation(data: {
@@ -35,7 +39,7 @@ export function createEscalation(data: {
 }): Escalation {
   const escalation: Escalation = {
     id: `esc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    source: data.source,
+    source: sourceOverride || data.source,
     taskId: data.taskId,
     taskTitle: data.taskTitle,
     question: data.question,

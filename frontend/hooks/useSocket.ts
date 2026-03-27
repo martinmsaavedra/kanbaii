@@ -53,7 +53,13 @@ export function useSocket() {
     socket.on('coordinator:completed' as any, (data: any) => app().onCoordinatorCompleted(data));
 
     // Escalation events (MCP-based)
-    socket.on('escalation:created' as any, (data: any) => app().onEscalationCreated(data));
+    socket.on('escalation:created' as any, (data: any) => {
+      app().onEscalationCreated(data);
+      // If source is planner, also set planner-specific escalation for inline chat rendering
+      if (data.source === 'planner') {
+        app().onPlannerEscalation(data);
+      }
+    });
     socket.on('escalation:responded' as any, (data: any) => {
       app().onEscalationResponded();
       // Also clear planner escalation if it was a planner source (e.g. Telegram response)

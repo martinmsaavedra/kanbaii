@@ -3,7 +3,7 @@ import { emit } from '../lib/typedEmit';
 import { plannerStore } from './plannerStore';
 import * as projectStore from '../services/projectStore';
 import * as workItemStore from '../services/workItemStore';
-import { createEscalation } from '../services/escalationService';
+import { createEscalation, setSourceOverride } from '../services/escalationService';
 
 let currentRunner: ClaudeRunner | null = null;
 let locked = false;
@@ -51,6 +51,7 @@ export async function startPlanner(projectSlug: string, prompt: string): Promise
 
   locked = true;
   plannerStore.start(projectSlug, prompt);
+  setSourceOverride('planner');
 
   emit('planner:started' as any, { projectSlug });
 
@@ -85,19 +86,22 @@ export async function startPlanner(projectSlug: string, prompt: string): Promise
     }
   });
 
-  // Listen for tool calls — parse structured notifications
-  runner.on('tool', (data: { tool: string; content: any }) => {
-    console.log(`[planner] tool call: ${data.tool}`, JSON.stringify(data.content)?.slice(0, 200));
+  // Track discovered item counter for auto-ID
+  let discoveredCount = 0;
 
-    if (data.tool === 'send_notification') {
+  // Listen for tool calls — parse structured notifications + track progress
+  runner.on('tool', (data: { tool: string; content: any }) => {
+    const toolName = data.tool || '';
+    console.log(`[planner] tool: ${toolName}`, JSON.stringify(data.content)?.slice(0, 200));
+
+    // send_notification (with or without MCP prefix)
+    if (toolName === 'send_notification' || toolName.endsWith('send_notification')) {
       const rawMessage = data.content?.message || '';
-      // Try to parse as JSON notification
       try {
         const payload = JSON.parse(rawMessage);
         console.log(`[planner] notification parsed:`, payload.type);
         handleNotification(payload);
       } catch {
-        // Plain text notification — show as system message
         if (rawMessage) {
           const msg = plannerStore.addMessage('system', rawMessage);
           emit('planner:message' as any, { id: msg.id, role: 'system', content: rawMessage });
@@ -105,38 +109,24 @@ export async function startPlanner(projectSlug: string, prompt: string): Promise
       }
     }
 
-    // Also try to detect item patterns in ANY tool call's text output
-    // Claude might embed JSON in its text output instead of using send_notification
-    if (data.tool !== 'send_notification' && data.tool !== 'escalate_to_human') {
-      // Log for debugging
-      console.log(`[planner] non-notification tool: ${data.tool}`);
+    // Skill calls — track what Claude is doing
+    if (toolName === 'Skill') {
+      const skill = data.content?.skill || '';
+      const sysMsg = plannerStore.addMessage('system', `Using ${skill}...`);
+      emit('planner:message' as any, { id: sysMsg.id, role: 'system', content: sysMsg.content });
     }
   });
 
-  // Listen for escalations → inline chat questions
+  // Listen for escalations → add to chat history as escalation message
+  // NOTE: The actual escalation is created by the MCP server via HTTP POST to /api/escalation/create
+  // (with sourceOverride='planner'). We just need to add it to the planner's chat history.
   runner.on('escalation', (data: { tool: string; question: string; input: any }) => {
     const options = data.input?.options || [];
-    const esc = createEscalation({
-      source: 'planner',
-      taskId: 'planner',
-      taskTitle: 'AI Planner',
-      question: data.question,
-      options,
-    });
+    console.log(`[planner] escalation detected: "${data.question.slice(0, 80)}..." options:`, options);
 
-    // Store as escalation message in chat history
+    // Add to chat as escalation message
     const msg = plannerStore.addMessage('escalation', data.question, options);
-
-    emit('planner:escalation' as any, {
-      id: esc.id,
-      source: 'planner',
-      taskId: 'planner',
-      taskTitle: 'AI Planner',
-      question: data.question,
-      options,
-      timeoutMs: esc.timeoutMs,
-      messageId: msg.id,
-    });
+    emit('planner:message' as any, { id: msg.id, role: 'escalation', content: data.question });
   });
 
   try {
@@ -160,6 +150,7 @@ export async function startPlanner(projectSlug: string, prompt: string): Promise
 
   currentRunner = null;
   plannerStore.stop();
+  setSourceOverride(null);
   locked = false;
 
   emit('planner:stopped' as any, { message: 'Planner session ended' });
@@ -204,6 +195,7 @@ function handleNotification(payload: any): void {
 export function stopPlanner(): void {
   if (currentRunner) currentRunner.stop();
   plannerStore.stop();
+  setSourceOverride(null);
   locked = false;
 }
 
