@@ -158,8 +158,8 @@ function ActiveHeader() {
           <span className="w-[7px] h-[7px] rounded-full bg-success animate-breathe shadow-[0_0_8px_rgba(52,211,153,0.4)]" />
         )}
         {/* Model badge */}
-        <span className="text-[9px] font-mono text-accent/50 bg-accent/5 px-1.5 py-0.5 rounded border border-accent/10 ml-1">
-          sonnet
+        <span className="text-[9px] font-mono text-amber-400/60 bg-amber-500/5 px-1.5 py-0.5 rounded border border-amber-500/10 ml-1">
+          opus
         </span>
       </div>
 

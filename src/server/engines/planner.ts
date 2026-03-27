@@ -135,7 +135,7 @@ export async function startPlanner(projectSlug: string, prompt: string): Promise
     await runner.run({
       prompt: `USER REQUEST:\n\n${prompt}\n\nIdentify all work items, send item:discovered for each, then clarify and plan. Be fast and direct.`,
       workingDir: project.workingDir,
-      model: 'sonnet',
+      model: 'opus',
       maxTurns: 100,
       timeout: 900000, // 15 min
       disallowedTools: PLANNER_DISALLOWED_TOOLS,
