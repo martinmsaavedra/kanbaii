@@ -34,13 +34,14 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 // --- Draggable Task Card ---
 
-function TaskCard({ task, columnKey, projectSlug, wiSlug, onEdit, onToggle, index, onDropOnCard }: {
+function TaskCard({ task, columnKey, projectSlug, wiSlug, onEdit, onToggle, onRunTask, index, onDropOnCard }: {
   task: any;
   columnKey: string;
   projectSlug: string;
   wiSlug: string;
   onEdit: () => void;
   onToggle: () => void;
+  onRunTask: () => void;
   index: number;
   onDropOnCard: (taskId: string, fromColumn: string, toColumn: string, toIndex: number) => void;
 }) {
@@ -98,7 +99,7 @@ function TaskCard({ task, columnKey, projectSlug, wiSlug, onEdit, onToggle, inde
     <div
       ref={ref}
       className={`
-        flex bg-card border border-border rounded-md cursor-pointer
+        group flex bg-card border border-border rounded-md cursor-pointer
         shadow-card overflow-hidden
         hover:-translate-y-[3px] hover:shadow-card-hover hover:border-border-light
         transition-all duration-200 ease-out-expo
@@ -138,14 +139,28 @@ function TaskCard({ task, columnKey, projectSlug, wiSlug, onEdit, onToggle, inde
             {task.completed && <span className="text-white text-[8px] leading-none">&#10003;</span>}
           </span>
           <div className="flex-1 min-w-0 flex flex-col gap-1">
-            <span className={`
-              text-[12.5px] font-medium text-text
-              overflow-hidden text-ellipsis whitespace-nowrap
-              leading-[1.4] tracking-[-0.01em]
-              ${task.completed ? 'line-through !text-text-muted' : ''}
-            `}>
-              {task.title}
-            </span>
+            <div className="flex items-center gap-1">
+              <span className={`
+                flex-1 text-[12.5px] font-medium text-text
+                overflow-hidden text-ellipsis whitespace-nowrap
+                leading-[1.4] tracking-[-0.01em]
+                ${task.completed ? 'line-through !text-text-muted' : ''}
+              `}>
+                {task.title}
+              </span>
+              {!task.completed && (
+                <button
+                  className="w-[18px] h-[18px] rounded-full shrink-0 flex items-center justify-center
+                             text-text-muted opacity-0 group-hover:opacity-100
+                             transition-all duration-150 ease-out-expo
+                             hover:text-success hover:bg-success-dim hover:shadow-[0_0_8px_rgba(52,211,153,0.2)]"
+                  onClick={(e) => { e.stopPropagation(); onRunTask(); }}
+                  title="Run this task with Ralph"
+                >
+                  <Play size={9} fill="currentColor" />
+                </button>
+              )}
+            </div>
             {task.description && (
               <span className="text-[10.5px] text-text-muted overflow-hidden text-ellipsis whitespace-nowrap mt-1.5 leading-[1.3]">
                 {task.description}
@@ -198,7 +213,7 @@ function TaskCard({ task, columnKey, projectSlug, wiSlug, onEdit, onToggle, inde
 
 // --- Drop Target Column ---
 
-function TaskColumn({ columnKey, label, tasks, projectSlug, wiSlug, onDrop, onEditTask, onToggleTask, onAddTask }: {
+function TaskColumn({ columnKey, label, tasks, projectSlug, wiSlug, onDrop, onEditTask, onToggleTask, onRunTask, onAddTask }: {
   columnKey: string;
   label: string;
   tasks: any[];
@@ -207,6 +222,7 @@ function TaskColumn({ columnKey, label, tasks, projectSlug, wiSlug, onDrop, onEd
   onDrop: (taskId: string, fromColumn: string, toColumn: string, toIndex: number) => void;
   onEditTask: (task: any) => void;
   onToggleTask: (taskId: string, completed: boolean, fromColumn: string) => void;
+  onRunTask: (taskId: string) => void;
   onAddTask: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -276,6 +292,7 @@ function TaskColumn({ columnKey, label, tasks, projectSlug, wiSlug, onDrop, onEd
               wiSlug={wiSlug}
               onEdit={() => onEditTask(task)}
               onToggle={() => onToggleTask(task.id, task.completed, columnKey)}
+              onRunTask={() => onRunTask(task.id)}
               index={index}
               onDropOnCard={onDrop}
             />
@@ -334,6 +351,36 @@ export function TaskBoard({ projectSlug, wiSlug }: Props) {
   const handleStopRalph = useCallback(async () => {
     await fetch(`${API}/api/ralph/stop`, { method: 'POST' });
   }, []);
+
+  const handleRunSingleTask = useCallback(async (taskId: string) => {
+    if (!wi) return;
+    const task = Object.values(wi.columns).flat().find((t: any) => t.id === taskId) as any;
+    if (!task) return;
+
+    // Move task to "todo" if not already there
+    const currentCol = Object.entries(wi.columns).find(([, tasks]) => (tasks as any[]).some(t => t.id === taskId))?.[0];
+    if (currentCol && currentCol !== 'todo') {
+      try {
+        await api.moveTask(projectSlug, wi.slug, taskId, { toColumn: 'todo', toIndex: 0 });
+        await fetchWorkItems(projectSlug);
+      } catch { addToast('Failed to move task', 'error'); return; }
+    }
+
+    // Start Ralph with ONLY this task
+    try {
+      const res = await fetch(`${API}/api/ralph/start`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectSlug, workItemSlug: wi.slug, taskIds: [taskId] }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setShowOutput(true);
+        addToast(`Running: ${task.title}`, 'success');
+      } else {
+        addToast(data.error || 'Failed to start', 'error');
+      }
+    } catch { addToast('Failed to start Ralph', 'error'); }
+  }, [wi, projectSlug, fetchWorkItems, addToast]);
 
   const handleMoveTask = useCallback(async (taskId: string, _fromColumn: string, toColumn: string, toIndex: number) => {
     if (!wi) return;
@@ -581,6 +628,7 @@ export function TaskBoard({ projectSlug, wiSlug }: Props) {
             onDrop={handleMoveTask}
             onEditTask={(task) => setTaskModal({ mode: 'edit', task })}
             onToggleTask={(taskId, completed) => handleToggleComplete(taskId, completed, key)}
+            onRunTask={handleRunSingleTask}
             onAddTask={() => setTaskModal({ mode: 'create', column: key })}
           />
         ))}

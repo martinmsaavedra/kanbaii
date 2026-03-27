@@ -16,9 +16,9 @@ export interface TaskSchedule {
   taskId: string;
   taskTitle: string;
   frequency: ScheduleFrequency;
-  time: string;          // HH:mm
-  dayOfWeek?: number;    // 0-6 (Sunday-Saturday) for weekly/biweekly
-  dayOfMonth?: number;   // 1-31 for monthly
+  time: string;
+  dayOfWeek?: number;
+  dayOfMonth?: number;
   timezone: string;
   enabled: boolean;
   lastRun: string | null;
@@ -26,14 +26,6 @@ export interface TaskSchedule {
   nextRun: string | null;
   runCount: number;
   createdAt: string;
-}
-
-export interface ScheduleRunLog {
-  scheduleId: string;
-  startedAt: string;
-  completedAt: string | null;
-  status: 'success' | 'failed' | 'running' | 'cancelled';
-  output?: string;
 }
 
 // ─── Persistence ───
@@ -72,42 +64,21 @@ export function getTaskSchedule(projectSlug: string, workItemSlug: string, taskI
 }
 
 export function createSchedule(data: {
-  projectSlug: string;
-  workItemSlug: string;
-  taskId: string;
-  taskTitle: string;
-  frequency: ScheduleFrequency;
-  time: string;
-  dayOfWeek?: number;
-  dayOfMonth?: number;
-  timezone?: string;
+  projectSlug: string; workItemSlug: string; taskId: string; taskTitle: string;
+  frequency: ScheduleFrequency; time: string; dayOfWeek?: number; dayOfMonth?: number; timezone?: string;
 }): TaskSchedule {
   const schedules = readSchedules();
-
-  // Remove existing schedule for this task
   const filtered = schedules.filter(s =>
     !(s.projectSlug === data.projectSlug && s.workItemSlug === data.workItemSlug && s.taskId === data.taskId)
   );
-
   const schedule: TaskSchedule = {
     id: `sched-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    projectSlug: data.projectSlug,
-    workItemSlug: data.workItemSlug,
-    taskId: data.taskId,
-    taskTitle: data.taskTitle,
-    frequency: data.frequency,
-    time: data.time,
-    dayOfWeek: data.dayOfWeek,
-    dayOfMonth: data.dayOfMonth,
+    ...data,
     timezone: data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-    enabled: true,
-    lastRun: null,
-    lastStatus: null,
+    enabled: true, lastRun: null, lastStatus: null,
     nextRun: computeNextRun(data.frequency, data.time, data.dayOfWeek, data.dayOfMonth),
-    runCount: 0,
-    createdAt: new Date().toISOString(),
+    runCount: 0, createdAt: new Date().toISOString(),
   };
-
   filtered.push(schedule);
   writeSchedules(filtered);
   return schedule;
@@ -117,79 +88,117 @@ export function updateSchedule(id: string, data: Partial<Pick<TaskSchedule, 'fre
   const schedules = readSchedules();
   const schedule = schedules.find(s => s.id === id);
   if (!schedule) return null;
-
   if (data.frequency !== undefined) schedule.frequency = data.frequency;
   if (data.time !== undefined) schedule.time = data.time;
   if (data.dayOfWeek !== undefined) schedule.dayOfWeek = data.dayOfWeek;
   if (data.dayOfMonth !== undefined) schedule.dayOfMonth = data.dayOfMonth;
   if (data.enabled !== undefined) schedule.enabled = data.enabled;
-
-  schedule.nextRun = schedule.enabled
-    ? computeNextRun(schedule.frequency, schedule.time, schedule.dayOfWeek, schedule.dayOfMonth)
-    : null;
-
+  schedule.nextRun = schedule.enabled ? computeNextRun(schedule.frequency, schedule.time, schedule.dayOfWeek, schedule.dayOfMonth) : null;
   writeSchedules(schedules);
   return schedule;
 }
 
 export function deleteSchedule(id: string): void {
-  const schedules = readSchedules().filter(s => s.id !== id);
-  writeSchedules(schedules);
+  writeSchedules(readSchedules().filter(s => s.id !== id));
 }
 
 export function markRunStarted(id: string): void {
   const schedules = readSchedules();
-  const schedule = schedules.find(s => s.id === id);
-  if (!schedule) return;
-  schedule.lastRun = new Date().toISOString();
-  schedule.lastStatus = 'running';
+  const s = schedules.find(s => s.id === id);
+  if (!s) return;
+  s.lastRun = new Date().toISOString();
+  s.lastStatus = 'running';
   writeSchedules(schedules);
 }
 
 export function markRunCompleted(id: string, status: 'success' | 'failed'): void {
   const schedules = readSchedules();
-  const schedule = schedules.find(s => s.id === id);
-  if (!schedule) return;
-  schedule.lastStatus = status;
-  schedule.runCount++;
+  const s = schedules.find(s => s.id === id);
+  if (!s) return;
+  s.lastStatus = status;
+  s.runCount++;
+  if (s.frequency === 'once') { s.enabled = false; s.nextRun = null; }
+  else { s.nextRun = computeNextRun(s.frequency, s.time, s.dayOfWeek, s.dayOfMonth); }
+  writeSchedules(schedules);
+}
 
-  // Compute next run (or null if once)
-  if (schedule.frequency === 'once') {
-    schedule.enabled = false;
-    schedule.nextRun = null;
-  } else {
-    schedule.nextRun = computeNextRun(schedule.frequency, schedule.time, schedule.dayOfWeek, schedule.dayOfMonth);
+// ─── Execute a single scheduled task via Ralph ───
+
+export async function executeScheduledTask(id: string): Promise<{ ok: boolean; error?: string }> {
+  const schedule = getSchedule(id);
+  if (!schedule) return { ok: false, error: 'Schedule not found' };
+
+  // Lazy import to avoid circular dependency
+  const { startRalph } = require('../engines/ralph');
+  const { runStore } = require('../engines/runStore');
+
+  // Check if Ralph is already busy
+  if (runStore.getState().status !== 'idle') {
+    return { ok: false, error: 'Ralph is busy with another run' };
   }
 
-  writeSchedules(schedules);
+  markRunStarted(id);
+
+  try {
+    // Move this specific task to "todo" if it's not already there
+    const workItemStore = require('./workItemStore');
+    const wi = workItemStore.getWorkItem(schedule.projectSlug, schedule.workItemSlug);
+    if (!wi) return { ok: false, error: 'Work item not found' };
+
+    // Find the task in any column
+    let taskFound = false;
+    for (const [col, tasks] of Object.entries(wi.columns)) {
+      const task = (tasks as any[]).find((t: any) => t.id === schedule.taskId);
+      if (task) {
+        if (col !== 'todo') {
+          workItemStore.moveTask(schedule.projectSlug, schedule.workItemSlug, schedule.taskId, {
+            toColumn: 'todo', toIndex: 0,
+          });
+          const updatedWI = workItemStore.getWorkItem(schedule.projectSlug, schedule.workItemSlug);
+          if (updatedWI) emit('workItem:updated', { projectSlug: schedule.projectSlug, workItem: updatedWI });
+        }
+        taskFound = true;
+        break;
+      }
+    }
+
+    if (!taskFound) {
+      markRunCompleted(id, 'failed');
+      return { ok: false, error: 'Task not found in work item' };
+    }
+
+    // Start Ralph on the work item — it will pick up the task from "todo"
+    startRalph({ projectSlug: schedule.projectSlug, workItemSlug: schedule.workItemSlug })
+      .then(() => { markRunCompleted(id, 'success'); })
+      .catch((err: Error) => {
+        markRunCompleted(id, 'failed');
+        console.error(`[scheduler] Task execution failed: ${err.message}`);
+      });
+
+    return { ok: true };
+  } catch (err) {
+    markRunCompleted(id, 'failed');
+    return { ok: false, error: (err as Error).message };
+  }
 }
 
 // ─── Stale Watchdog ───
 
-const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
-
-export function findStaleSchedules(): TaskSchedule[] {
-  const schedules = readSchedules();
-  const now = Date.now();
-  return schedules.filter(s => {
-    if (s.lastStatus !== 'running' || !s.lastRun) return false;
-    return (now - new Date(s.lastRun).getTime()) > STALE_THRESHOLD_MS;
-  });
-}
+const STALE_THRESHOLD_MS = 30 * 60 * 1000;
 
 export function resetStaleSchedules(): number {
   const schedules = readSchedules();
   const now = Date.now();
-  let resetCount = 0;
+  let count = 0;
   for (const s of schedules) {
     if (s.lastStatus === 'running' && s.lastRun && (now - new Date(s.lastRun).getTime()) > STALE_THRESHOLD_MS) {
       s.lastStatus = 'failed';
       s.nextRun = s.enabled ? computeNextRun(s.frequency, s.time, s.dayOfWeek, s.dayOfMonth) : null;
-      resetCount++;
+      count++;
     }
   }
-  if (resetCount > 0) writeSchedules(schedules);
-  return resetCount;
+  if (count > 0) writeSchedules(schedules);
+  return count;
 }
 
 // ─── Scheduler Loop ───
@@ -198,9 +207,7 @@ let checkInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startSchedulerLoop(): void {
   if (checkInterval) return;
-  // Reset stale on startup
   resetStaleSchedules();
-  // Check every 30 seconds
   checkInterval = setInterval(checkDueSchedules, 30_000);
   console.log('[scheduler] Loop started (30s interval)');
 }
@@ -216,19 +223,13 @@ export function isSchedulerRunning(): boolean {
 function checkDueSchedules(): void {
   const now = new Date();
   const schedules = readSchedules();
-
   for (const schedule of schedules) {
     if (!schedule.enabled || !schedule.nextRun || schedule.lastStatus === 'running') continue;
-
-    const nextRun = new Date(schedule.nextRun);
-    if (now >= nextRun) {
-      // Emit event — Ralph or task runner will pick it up
-      emit('ralph:output' as any, {
-        taskId: schedule.taskId,
-        message: `[scheduler] Triggering scheduled task: ${schedule.taskTitle}`,
+    if (now >= new Date(schedule.nextRun)) {
+      console.log(`[scheduler] Executing due task: ${schedule.taskTitle}`);
+      executeScheduledTask(schedule.id).catch(err => {
+        console.error(`[scheduler] Failed to execute: ${err}`);
       });
-
-      markRunStarted(schedule.id);
     }
   }
 }
@@ -243,68 +244,43 @@ function computeNextRun(frequency: ScheduleFrequency, time: string, dayOfWeek?: 
 
   switch (frequency) {
     case 'once':
-      if (next <= now) next.setDate(next.getDate() + 1);
-      break;
-
     case 'daily':
       if (next <= now) next.setDate(next.getDate() + 1);
       break;
-
-    case 'weekly':
+    case 'weekly': {
       if (dayOfWeek !== undefined) {
-        const currentDay = next.getDay();
-        let daysUntil = dayOfWeek - currentDay;
-        if (daysUntil < 0 || (daysUntil === 0 && next <= now)) daysUntil += 7;
-        next.setDate(next.getDate() + daysUntil);
-      } else {
-        if (next <= now) next.setDate(next.getDate() + 7);
-      }
+        let d = dayOfWeek - next.getDay();
+        if (d < 0 || (d === 0 && next <= now)) d += 7;
+        next.setDate(next.getDate() + d);
+      } else if (next <= now) next.setDate(next.getDate() + 7);
       break;
-
-    case 'biweekly':
+    }
+    case 'biweekly': {
       if (dayOfWeek !== undefined) {
-        const currentDay = next.getDay();
-        let daysUntil = dayOfWeek - currentDay;
-        if (daysUntil < 0 || (daysUntil === 0 && next <= now)) daysUntil += 14;
-        next.setDate(next.getDate() + daysUntil);
-      } else {
-        if (next <= now) next.setDate(next.getDate() + 14);
-      }
+        let d = dayOfWeek - next.getDay();
+        if (d < 0 || (d === 0 && next <= now)) d += 14;
+        next.setDate(next.getDate() + d);
+      } else if (next <= now) next.setDate(next.getDate() + 14);
       break;
-
+    }
     case 'monthly':
-      if (dayOfMonth !== undefined) {
-        next.setDate(dayOfMonth);
-        if (next <= now) next.setMonth(next.getMonth() + 1);
-      } else {
-        if (next <= now) next.setMonth(next.getMonth() + 1);
-      }
+      if (dayOfMonth !== undefined) { next.setDate(dayOfMonth); if (next <= now) next.setMonth(next.getMonth() + 1); }
+      else if (next <= now) next.setMonth(next.getMonth() + 1);
       break;
   }
-
   return next.toISOString();
 }
 
-// Summary for UI
-export function getSchedulerStatus(): {
-  running: boolean;
-  totalSchedules: number;
-  active: number;
-  runningNow: number;
-  nextDue: string | null;
-} {
+export function getSchedulerStatus() {
   const schedules = readSchedules();
   const active = schedules.filter(s => s.enabled);
-  const runningNow = schedules.filter(s => s.lastStatus === 'running');
-  const nextDue = active
-    .filter(s => s.nextRun)
-    .sort((a, b) => new Date(a.nextRun!).getTime() - new Date(b.nextRun!).getTime())[0];
-
+  const running = schedules.filter(s => s.lastStatus === 'running');
+  const next = active.filter(s => s.nextRun).sort((a, b) => new Date(a.nextRun!).getTime() - new Date(b.nextRun!).getTime())[0];
   return {
     running: isSchedulerRunning(),
     totalSchedules: schedules.length,
     active: active.length,
-    runningNow: runningNow.length,
-    nextDue: nextDue?.nextRun || null,
+    runningNow: running.length,
+    nextDue: next?.nextRun || null,
   };
 }

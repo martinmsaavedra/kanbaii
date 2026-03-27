@@ -15,11 +15,12 @@ let currentRunner: ClaudeRunner | null = null;
 export interface RalphConfig {
   projectSlug: string;
   workItemSlug: string;
-  maxErrors?: number;  // circuit breaker, default 3
+  taskIds?: string[];    // If provided, only run these specific tasks from todo
+  maxErrors?: number;
 }
 
 export async function startRalph(config: RalphConfig): Promise<void> {
-  const { projectSlug, workItemSlug, maxErrors = 3 } = config;
+  const { projectSlug, workItemSlug, taskIds: filterTaskIds, maxErrors = 3 } = config;
 
   // Validate
   const project = projectStore.getProject(projectSlug);
@@ -33,8 +34,11 @@ export async function startRalph(config: RalphConfig): Promise<void> {
   }
   const workingDir = project.workingDir;
 
-  // Get tasks from Todo column
-  const todoTasks = wi.columns['todo'];
+  // Get tasks from Todo column (optionally filtered)
+  let todoTasks = wi.columns['todo'];
+  if (filterTaskIds?.length) {
+    todoTasks = todoTasks.filter((t) => filterTaskIds.includes(t.id));
+  }
   if (todoTasks.length === 0) throw new Error('No tasks in Todo column');
 
   // Acquire lock
@@ -102,6 +106,16 @@ export async function startRalph(config: RalphConfig): Promise<void> {
     runner.on('output', (chunk: string) => {
       output += chunk;
       emit('ralph:output', { taskId: task.id, message: chunk });
+    });
+
+    runner.on('input-needed', (context: string) => {
+      emit('ralph:input-needed' as any, {
+        taskId: task.id,
+        taskTitle: task.title,
+        context,
+        projectSlug,
+        workItemSlug,
+      });
     });
 
     try {
@@ -207,6 +221,12 @@ export function pauseRalph(): void {
 
 export function resumeRalph(): void {
   runStore.resume();
+}
+
+export function sendInputToRunner(text: string): void {
+  if (currentRunner) {
+    currentRunner.sendInput(text);
+  }
 }
 
 function buildTaskPrompt(project: any, wi: any, task: any): string {

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { startTeams, stopTeams, getTeamsState } from '../engines/teams';
+import { startTeams, stopTeams, getTeamsState, sendInputToWorker } from '../engines/teams';
 
 const router = Router();
 
@@ -25,6 +25,18 @@ router.post('/start', async (req: Request, res: Response) => {
 router.post('/stop', (_req: Request, res: Response) => {
   stopTeams();
   res.json({ ok: true, data: { message: 'Teams stopped' } });
+});
+
+// POST /api/teams/input — send user input to a worker's Claude process
+router.post('/input', (req: Request, res: Response) => {
+  const { workerId, text } = req.body;
+  if (!text) return res.status(400).json({ ok: false, error: 'text required' });
+  const sent = sendInputToWorker(workerId || '', text);
+  if (sent) {
+    res.json({ ok: true });
+  } else {
+    res.status(409).json({ ok: false, error: 'No active worker to receive input' });
+  }
 });
 
 // GET /api/teams/state

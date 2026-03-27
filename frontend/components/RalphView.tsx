@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Cpu, Play, Square, Pause, RotateCcw } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import { useToastStore } from '@/stores/toastStore';
@@ -20,12 +20,17 @@ export function RalphView({ projectSlug, wiSlug }: { projectSlug: string; wiSlug
 
   const handleStart = useCallback(async () => {
     try {
-      await fetch(`${API}/api/ralph/start`, {
+      const res = await fetch(`${API}/api/ralph/start`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectSlug, workItemSlug: wiSlug }),
       });
-      addToast('Ralph started', 'success');
-    } catch { addToast('Failed to start', 'error'); }
+      const data = await res.json();
+      if (data.ok) {
+        addToast('Ralph started', 'success');
+      } else {
+        addToast(data.error || 'Failed to start Ralph', 'error');
+      }
+    } catch { addToast('Failed to connect to server', 'error'); }
   }, [projectSlug, wiSlug, addToast]);
 
   const handleStop = useCallback(async () => {
@@ -43,6 +48,12 @@ export function RalphView({ projectSlug, wiSlug }: { projectSlug: string; wiSlug
   const progress = ralph.stats.total > 0
     ? ((ralph.stats.completed + ralph.stats.failed) / ralph.stats.total) * 100
     : 0;
+
+  // Auto-scroll output
+  const outputRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight;
+  }, [ralph.output]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -143,24 +154,73 @@ export function RalphView({ projectSlug, wiSlug }: { projectSlug: string; wiSlug
           </div>
         </div>
 
-        {/* Output panel */}
-        <div className="flex-1 flex flex-col p-5 overflow-hidden">
-          <div className="text-data font-semibold text-text-muted uppercase tracking-widest font-mono mb-2">Output</div>
-          <div className="flex-1 overflow-y-auto bg-bg border border-border rounded-md p-3 px-4
-                          font-mono text-data leading-relaxed text-text-muted
-                          shadow-[inset_0_1px_4px_rgba(0,0,0,0.15)]">
-            {ralph.output.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full gap-3 opacity-30">
-                <Cpu size={28} />
-                <span className="text-label font-mono">Waiting for output...</span>
+        {/* Output panel — live streaming */}
+        <OutputPanel output={ralph.output} isRunning={isRunning && isForThisWI} />
+      </div>
+    </div>
+  );
+}
+
+/* ═══ Streaming Output Panel ═══ */
+function OutputPanel({ output, isRunning }: { output: string[]; isRunning: boolean }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [output]);
+
+  return (
+    <div className="flex-1 flex flex-col p-5 overflow-hidden">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-data font-semibold text-text-muted uppercase tracking-widest font-mono">Output</span>
+        {isRunning && (
+          <span className="flex items-center gap-1.5 text-xxs text-success font-mono font-medium animate-breathe">
+            <span className="w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_6px_rgba(52,211,153,0.5)]" />
+            streaming
+          </span>
+        )}
+      </div>
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto bg-[#06060a] border border-border rounded-md p-3 px-4
+                    font-mono text-[11px] leading-[1.7] text-text-muted
+                    shadow-[inset_0_2px_6px_rgba(0,0,0,0.3)]"
+      >
+        {output.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 opacity-20">
+            <Cpu size={28} />
+            <span className="text-label font-mono">
+              {isRunning ? 'Connecting to Claude...' : 'Output will appear here'}
+            </span>
+            {isRunning && (
+              <div className="flex gap-1 mt-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
-            ) : (
-              ralph.output.map((line, i) => (
-                <div key={i} className="whitespace-pre-wrap break-all">{line}</div>
-              ))
             )}
           </div>
-        </div>
+        ) : (
+          output.map((line, i) => (
+            <div
+              key={i}
+              className={`whitespace-pre-wrap break-all py-px ${
+                line.startsWith('⚡') ? 'text-accent font-semibold' :
+                line.startsWith('  →') ? 'text-text-muted opacity-60 text-[10px]' :
+                line.startsWith('ERROR') ? 'text-danger' :
+                ''
+              }`}
+            >
+              {line}
+            </div>
+          ))
+        )}
+        {/* Streaming cursor */}
+        {isRunning && output.length > 0 && (
+          <span className="inline-block w-[6px] h-[14px] bg-accent animate-blink ml-0.5 -mb-0.5" />
+        )}
       </div>
     </div>
   );

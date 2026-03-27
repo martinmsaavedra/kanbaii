@@ -87,9 +87,7 @@ export function fetchClaudeUsage(): Promise<void> {
         res.on('data', (c: Buffer) => (data += c));
         res.on('end', () => {
           if (res.statusCode === 429) {
-            // Rate limited — retry in 15 seconds
-            console.log('[claude-usage] Rate limited, retrying in 15s');
-            setTimeout(() => fetchClaudeUsage(), 15000);
+            // Rate limited — don't spam retries, wait for next poll cycle
             resolve();
             return;
           }

@@ -9,6 +9,12 @@ import { create } from 'zustand';
 
 export type RalphStatus = 'idle' | 'running' | 'paused' | 'stopping';
 
+export interface RalphInputRequest {
+  taskId: string;
+  taskTitle: string;
+  context: string;
+}
+
 export interface RalphRun {
   status: RalphStatus;
   runId: string | null;
@@ -16,6 +22,7 @@ export interface RalphRun {
   workItemSlug: string | null;
   currentTaskId: string | null;
   currentTaskTitle: string | null;
+  inputNeeded: RalphInputRequest | null;
   stats: {
     total: number;
     completed: number;
@@ -42,23 +49,31 @@ export interface TeamsMetrics {
   totalTasks: number;
 }
 
+export interface TeamsInputRequest {
+  workerId: string;
+  taskId: string;
+  taskTitle: string;
+  context: string;
+}
+
 export interface TeamsState {
   active: boolean;
   projectSlug: string | null;
   workers: TeamsWorker[];
   metrics: TeamsMetrics | null;
   logs: string[];
+  inputNeeded: TeamsInputRequest | null;
 }
 
 const IDLE_RALPH: RalphRun = {
   status: 'idle', runId: null, projectSlug: null, workItemSlug: null,
-  currentTaskId: null, currentTaskTitle: null,
+  currentTaskId: null, currentTaskTitle: null, inputNeeded: null,
   stats: { total: 0, completed: 0, failed: 0, skipped: 0, startedAt: null },
   output: [],
 };
 
 const IDLE_TEAMS: TeamsState = {
-  active: false, projectSlug: null, workers: [], metrics: null, logs: [],
+  active: false, projectSlug: null, workers: [], metrics: null, logs: [], inputNeeded: null,
 };
 
 interface AppStore {
@@ -72,6 +87,8 @@ interface AppStore {
   onRalphOutput: (data: { taskId: string; message: string }) => void;
   onRalphCompleted: (data: { stats: any; message: string }) => void;
   onRalphError: (data: { taskId?: string; message?: string }) => void;
+  onRalphInputNeeded: (data: RalphInputRequest) => void;
+  clearRalphInput: () => void;
 
   // --- Teams (SSOT) ---
   teams: TeamsState;
@@ -81,6 +98,8 @@ interface AppStore {
   onTeamsMetrics: (data: TeamsMetrics) => void;
   onTeamsOutput: (data: { workerId: string; taskId: string; message: string }) => void;
   onTeamsStopped: (data: { message: string }) => void;
+  onTeamsInputNeeded: (data: TeamsInputRequest) => void;
+  clearTeamsInput: () => void;
 
   // --- Terminal (SSOT) ---
   terminal: { status: string; output: string[]; projectSlug: string | null };
@@ -108,7 +127,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   onRalphStarted: (data) => set({
     ralph: {
       status: 'running', runId: null, projectSlug: data.projectSlug, workItemSlug: null,
-      currentTaskId: null, currentTaskTitle: null,
+      currentTaskId: null, currentTaskTitle: null, inputNeeded: null,
       stats: { total: data.total, completed: 0, failed: 0, skipped: 0, startedAt: new Date().toISOString() },
       output: [],
     },
@@ -126,6 +145,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
     ralph: { ...s.ralph, status: 'idle', currentTaskId: null, currentTaskTitle: null },
   })),
   onRalphError: (data) => { if (data.message) get().appendRalphOutput(`ERROR: ${data.message}`); },
+  onRalphInputNeeded: (data) => set((s) => ({
+    ralph: { ...s.ralph, inputNeeded: data },
+  })),
+  clearRalphInput: () => set((s) => ({
+    ralph: { ...s.ralph, inputNeeded: null },
+  })),
 
   // --- Teams ---
   teams: { ...IDLE_TEAMS },
@@ -136,6 +161,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       projectSlug: data.projectSlug,
       workers: [],
       metrics: null,
+      inputNeeded: null,
       logs: [`Teams started: ${data.workItemSlugs.length} work items, ${data.maxWorkers} workers`],
     },
   }),
@@ -152,7 +178,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
     teams: { ...s.teams, logs: [...s.teams.logs.slice(-300), data.message] },
   })),
   onTeamsStopped: (data) => set((s) => ({
-    teams: { ...s.teams, active: false, logs: [...s.teams.logs, `\n--- ${data.message} ---`] },
+    teams: { ...s.teams, active: false, inputNeeded: null, logs: [...s.teams.logs, `\n--- ${data.message} ---`] },
+  })),
+  onTeamsInputNeeded: (data) => set((s) => ({
+    teams: { ...s.teams, inputNeeded: data },
+  })),
+  clearTeamsInput: () => set((s) => ({
+    teams: { ...s.teams, inputNeeded: null },
   })),
 
   // --- Terminal ---

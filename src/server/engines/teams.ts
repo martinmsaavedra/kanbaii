@@ -88,6 +88,17 @@ export async function startTeams(config: TeamsConfig): Promise<void> {
         emit('live:output', { workerId, taskId: task.id, message: chunk });
       });
 
+      worker.runner!.on('input-needed', (context: string) => {
+        emit('teams:input-needed' as any, {
+          workerId,
+          taskId: task.id,
+          taskTitle: task.title,
+          context,
+          projectSlug,
+          workItemSlug: wiSlug,
+        });
+      });
+
       try {
         const result = await worker.runner!.run({
           prompt,
@@ -148,6 +159,21 @@ export function stopTeams(): void {
   for (const w of workers) {
     if (w.runner) w.runner.stop();
   }
+}
+
+export function sendInputToWorker(workerId: string, text: string): boolean {
+  const worker = workers.find(w => w.id === workerId);
+  if (worker?.runner) {
+    worker.runner.sendInput(text);
+    return true;
+  }
+  // If no specific workerId, send to first running worker
+  const running = workers.find(w => w.status === 'running' && w.runner);
+  if (running?.runner) {
+    running.runner.sendInput(text);
+    return true;
+  }
+  return false;
 }
 
 export function getTeamsState() {

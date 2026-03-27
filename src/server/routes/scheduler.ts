@@ -47,12 +47,17 @@ router.delete('/schedules/:id', (req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
-// POST /api/scheduler/schedules/:id/run — run now
-router.post('/schedules/:id/run', (req: Request, res: Response) => {
-  const schedule = scheduler.getSchedule(req.params.id);
-  if (!schedule) return res.status(404).json({ ok: false, error: 'Schedule not found' });
-  scheduler.markRunStarted(schedule.id);
-  res.json({ ok: true, data: { message: `Triggered: ${schedule.taskTitle}` } });
+// POST /api/scheduler/schedules/:id/run — run now (executes via Ralph)
+router.post('/schedules/:id/run', async (req: Request, res: Response) => {
+  try {
+    const result = await scheduler.executeScheduledTask(req.params.id);
+    if (!result.ok) {
+      return res.status(409).json({ ok: false, error: result.error });
+    }
+    res.json({ ok: true, data: { message: 'Task execution started' } });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: (err as Error).message });
+  }
 });
 
 // POST /api/scheduler/schedules/:id/cancel — cancel running

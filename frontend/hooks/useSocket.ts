@@ -36,6 +36,7 @@ export function useSocket() {
     socket.on('ralph:output', (data) => app().onRalphOutput(data));
     socket.on('ralph:completed', (data) => app().onRalphCompleted(data));
     socket.on('ralph:error', (data) => app().onRalphError(data));
+    socket.on('ralph:input-needed' as any, (data: any) => app().onRalphInputNeeded(data));
 
     // Teams events → appStore (ALL of them, not just active flag)
     socket.on('live:started', (data) => app().onTeamsStarted(data));
@@ -44,6 +45,7 @@ export function useSocket() {
     socket.on('live:metrics', (data) => app().onTeamsMetrics(data));
     socket.on('live:output', (data) => app().onTeamsOutput(data));
     socket.on('live:stopped', (data) => app().onTeamsStopped(data));
+    socket.on('teams:input-needed' as any, (data: any) => app().onTeamsInputNeeded(data));
 
     // Terminal events → appStore
     socket.on('terminal:output' as any, (data: any) => {

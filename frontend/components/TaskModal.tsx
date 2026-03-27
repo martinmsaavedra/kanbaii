@@ -394,11 +394,21 @@ function TaskScheduleSection({ projectSlug, wiSlug, task }: { projectSlug: strin
     fetchSchedule();
   };
 
+  const [runningNow, setRunningNow] = useState(false);
+
   const handleRunNow = async () => {
-    if (!schedule) return;
-    await fetch(`${API}/api/scheduler/schedules/${schedule.id}/run`, { method: 'POST' });
-    addToast('Triggered', 'success');
-    fetchSchedule();
+    if (!schedule || runningNow) return;
+    setRunningNow(true);
+    try {
+      const res = await fetch(`${API}/api/scheduler/schedules/${schedule.id}/run`, { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        addToast('Task execution started via Ralph', 'success');
+      } else {
+        addToast(data.error || 'Failed to start', 'error');
+      }
+    } catch { addToast('Failed to trigger', 'error'); }
+    setTimeout(() => { setRunningNow(false); fetchSchedule(); }, 2000);
   };
 
   return (
@@ -431,8 +441,13 @@ function TaskScheduleSection({ projectSlug, wiSlug, task }: { projectSlug: strin
               type="button"
               className="inline-flex items-center gap-[3px] text-xxs font-medium py-[3px] px-2 rounded-xs font-mono text-text-muted border border-border transition-all duration-120 ease-out-expo hover:text-accent hover:border-[rgba(99,102,241,0.2)] hover:bg-accent-muted"
               onClick={handleRunNow}
+              disabled={runningNow}
             >
-              <Play size={10} /> Run Now
+              {runningNow ? (
+                <><span className="inline-block w-2.5 h-2.5 border border-white/20 border-t-white rounded-full animate-spin" /> Running...</>
+              ) : (
+                <><Play size={10} /> Run Now</>
+              )}
             </button>
             <button
               type="button"

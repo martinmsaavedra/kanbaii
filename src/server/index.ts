@@ -30,6 +30,7 @@ import authRoutes from './routes/auth';
 import voiceRoutes from './routes/voice';
 import { authMiddleware } from './lib/authMiddleware';
 import { startPolling as startUsagePolling } from './services/claudeUsage';
+import { startSchedulerLoop } from './services/schedulerService';
 
 const PORT = parseInt(process.env.KANBAII_PORT || '5555', 10);
 const DATA_DIR = path.resolve(process.env.KANBAII_DATA_DIR || path.join(process.cwd(), 'data', 'projects'));
@@ -139,7 +140,8 @@ if (require.main === module) {
   const { httpServer, watcher } = createApp();
 
   watcher.start();
-  startUsagePolling(60000); // Poll Claude usage every 60s
+  startUsagePolling(60000);
+  startSchedulerLoop();
 
   httpServer.listen(PORT, () => {
     console.log(`\n  ⬡ KANBAII server running on http://localhost:${PORT}\n`);

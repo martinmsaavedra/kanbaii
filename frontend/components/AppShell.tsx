@@ -7,6 +7,7 @@ import { Breadcrumb } from './Breadcrumb';
 import { ToastContainer } from './Toast';
 import { KeyboardHelp } from './KeyboardHelp';
 import { CommandPalette } from './CommandPalette';
+import { RalphInputModal } from './RalphInputModal';
 import { useSocket } from '@/hooks/useSocket';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
@@ -41,6 +42,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <ToastContainer />
+      <RalphInputModal />
       {showHelp && <KeyboardHelp onClose={closeHelp} />}
       {showCommandPalette && (
         <CommandPalette
