@@ -23,19 +23,43 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      # Install server dependencies
-      - run: npm ci
-
-      # Build server + CLI (production, no source maps)
-      - run: npx tsc -p tsconfig.build.json
-
-      # Install frontend dependencies + build
-      - run: cd frontend && npm ci && npm run build
-
-      # Copy frontend build to dashboard/
-      - run: rm -rf dashboard && cp -r frontend/out dashboard
-
-      # Publish to npm
-      - run: npm publish --access public --provenance
+      # Check if this version is already published — skip if so
+      - name: Check if version exists
+        id: version_check
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$PKG_VERSION" >> $GITHUB_OUTPUT
+          if npm view kanbaii@$PKG_VERSION version 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Version $PKG_VERSION already published — skipping"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✓ Version $PKG_VERSION is new — will publish"
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Install server dependencies
+      - if: steps.version_check.outputs.exists == 'false'
+        run: npm ci
+
+      # Build server + CLI (production, no source maps)
+      - if: steps.version_check.outputs.exists == 'false'
+        run: npx tsc -p tsconfig.build.json
+
+      # Install frontend dependencies + build
+      - if: steps.version_check.outputs.exists == 'false'
+        run: cd frontend && npm ci && npm run build
+
+      # Copy frontend build to dashboard/
+      - if: steps.version_check.outputs.exists == 'false'
+        run: rm -rf dashboard && cp -r frontend/out dashboard
+
+      # Publish to npm
+      - if: steps.version_check.outputs.exists == 'false'
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - if: steps.version_check.outputs.exists == 'false'
+        run: echo "✅ Published kanbaii@${{ steps.version_check.outputs.version }}"
