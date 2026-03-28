@@ -160,11 +160,20 @@ npm test
 npm start             # Serves everything on :5555
 ```
 
-## Git Strategy — Trunk-Based
+## Git Strategy — develop + master
 
 ```
-main ← trunk. Direct push. No feature branches unless experimental.
+develop ← daily work. All commits go here.
+master  ← production. Auto-publishes to npm via GitHub Action.
 ```
+
+### REGLA ABSOLUTA: NUNCA pushear directo a master
+
+- **Todo el trabajo se hace en `develop`**
+- Para publicar: merge develop → master (via PR o merge local)
+- El GitHub Action en master auto-buildea y publica a npm
+- NUNCA hacer `git push origin master` con cambios directos
+- NUNCA hacer `npm publish` manual — el CI lo hace
 
 ### Commit format
 ```
@@ -177,7 +186,8 @@ refactor(scope): description
 - Never `git add .` or `git add -A` — specific files only
 - Never commit `.env`, `data/`, `node_modules/`
 - Run `npm test` before push
-- Never force push
+- Never force push to master
+- Always verify current branch with `git branch` before pushing
 
 ## Testing
 
