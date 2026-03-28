@@ -243,7 +243,7 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
               )}
             </div>
 
-            <div ref={thinkingRef} className="flex-1 overflow-y-auto bg-[#06060a] border border-border rounded-md p-4 font-mono text-[11px] leading-[1.8] shadow-[inset_0_2px_6px_rgba(0,0,0,0.3)]">
+            <div ref={thinkingRef} className="flex-1 overflow-y-auto bg-[var(--console-bg)] border border-border rounded-md p-4 font-mono text-[11px] leading-[1.8] shadow-[inset_0_2px_6px_rgba(0,0,0,0.3)]">
               {!hasThinking && teams.logs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3 opacity-20">
                   <Brain size={28} />
@@ -408,7 +408,7 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
                   </div>
                   <div
                     ref={workerLogRef}
-                    className="flex-1 overflow-y-auto bg-[#06060a] border border-t-0 border-accent/10 rounded-b-md p-3 font-mono text-[11px] leading-[1.7] shadow-[inset_0_2px_6px_rgba(0,0,0,0.3)]"
+                    className="flex-1 overflow-y-auto bg-[var(--console-bg)] border border-t-0 border-accent/10 rounded-b-md p-3 font-mono text-[11px] leading-[1.7] shadow-[inset_0_2px_6px_rgba(0,0,0,0.3)]"
                   >
                     {wLogs.length === 0 ? (
                       <div className="flex items-center justify-center h-full opacity-20">

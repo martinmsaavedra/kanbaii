@@ -32,6 +32,9 @@ interface CompletedResult {
   completedAt: string;
 }
 
+const MAX_COMPLETED_RESULTS = 100;
+const MAX_WORKER_AGE_MS = 30 * 60 * 1000; // 30 minutes
+
 let _workers: Map<string, { info: WorkerInfo; runner: ClaudeRunner }> = new Map();
 let _completedResults: CompletedResult[] = [];
 let _maxWorkers = 3;
@@ -233,6 +236,7 @@ export async function assignTask(opts: {
       totalFailed: _completedResults.filter(r => !r.success).length,
       totalTasks: _completedResults.length,
     });
+    cleanup();
   })();
 
   return { workerId };
@@ -241,5 +245,18 @@ export async function assignTask(opts: {
 export function stopAllWorkers(): void {
   for (const { runner } of _workers.values()) {
     try { runner.stop(); } catch {}
+  }
+}
+
+function cleanup(): void {
+  const now = Date.now();
+  for (const [id, { info }] of _workers) {
+    if (info.status !== 'running' && info.completedAt) {
+      const age = now - new Date(info.completedAt).getTime();
+      if (age > MAX_WORKER_AGE_MS) _workers.delete(id);
+    }
+  }
+  if (_completedResults.length > MAX_COMPLETED_RESULTS) {
+    _completedResults = _completedResults.slice(-MAX_COMPLETED_RESULTS);
   }
 }

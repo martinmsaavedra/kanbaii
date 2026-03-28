@@ -23,6 +23,11 @@ export interface ClaudeUsageData {
 let usageCache: ClaudeUsageData | null = null;
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 
+// ─── Backoff ───
+
+let _backoffMs = 0;
+const MAX_BACKOFF = 5 * 60 * 1000; // 5 minutes max
+
 export function getCachedUsage(): ClaudeUsageData | null {
   return usageCache;
 }
@@ -88,7 +93,8 @@ export function fetchClaudeUsage(): Promise<void> {
         res.on('data', (c: Buffer) => (data += c));
         res.on('end', () => {
           if (res.statusCode === 429) {
-            console.warn('[claude-usage] Rate limited (429), waiting for next poll');
+            _backoffMs = Math.min((_backoffMs || 15000) * 2, MAX_BACKOFF);
+            console.warn(`[claude-usage] Rate limited, backing off ${Math.round(_backoffMs / 1000)}s`);
             resolve();
             return;
           }
@@ -135,6 +141,7 @@ export function fetchClaudeUsage(): Promise<void> {
             }
 
             usageCache = { entries, timestamp: new Date().toISOString() };
+            _backoffMs = 0;
 
             // Broadcast via Socket.IO
             try { getIO().emit('claude-usage' as any, usageCache); } catch {}
@@ -144,7 +151,11 @@ export function fetchClaudeUsage(): Promise<void> {
       }
     );
 
-    req.on('error', (err) => { console.warn(`[claude-usage] Request error: ${err.message}`); resolve(); });
+    req.on('error', (err) => {
+      _backoffMs = Math.min((_backoffMs || 15000) * 2, MAX_BACKOFF);
+      console.warn(`[claude-usage] Request error: ${err.message}, backing off ${Math.round(_backoffMs / 1000)}s`);
+      resolve();
+    });
     req.setTimeout(15000, () => { console.warn('[claude-usage] Request timeout (15s)'); req.destroy(); resolve(); });
     req.end();
   });
@@ -152,13 +163,28 @@ export function fetchClaudeUsage(): Promise<void> {
 
 // ─── Polling ───
 
+let _pollActive = false;
+let _pollTimer: ReturnType<typeof setTimeout> | null = null;
+
 export function startPolling(intervalMs: number = 60000): void {
-  if (pollInterval) return;
-  fetchClaudeUsage(); // Immediate first fetch
-  pollInterval = setInterval(() => fetchClaudeUsage(), intervalMs);
-  console.log(`[claude-usage] Polling started (${intervalMs / 1000}s interval)`);
+  if (_pollActive) return;
+  _pollActive = true;
+  console.log(`[claude-usage] Polling started (${intervalMs / 1000}s base interval)`);
+
+  const poll = async () => {
+    if (!_pollActive) return;
+    await fetchClaudeUsage();
+    if (!_pollActive) return;
+    const delay = _backoffMs > 0 ? _backoffMs : intervalMs;
+    _pollTimer = setTimeout(poll, delay);
+  };
+
+  poll(); // Immediate first fetch
 }
 
 export function stopPolling(): void {
+  _pollActive = false;
+  if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null; }
+  // Legacy: clear interval reference if any
   if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
 }

@@ -5,6 +5,7 @@ import { getSocket, disconnectSocket } from '@/lib/socket';
 import { useProjectStore } from '@/stores/projectStore';
 import { useWorkItemStore } from '@/stores/workItemStore';
 import { useAppStore } from '@/stores/appStore';
+import { useRouterStore } from '@/stores/routerStore';
 
 /**
  * Central socket wiring. ALL events go to stores, NEVER to local state.
@@ -96,13 +97,21 @@ export function useSocket() {
     socket.on('planner:item-approved' as any, (data: any) => app().onPlannerItemApproved(data));
     socket.on('planner:stopped' as any, () => app().onPlannerStopped());
 
-    // Terminal events → appStore
+    // Terminal events → appStore (filtered by current project)
     socket.on('terminal:output' as any, (data: any) => {
+      const currentSlug = useRouterStore.getState().projectSlug;
+      if (data.projectSlug && data.projectSlug !== currentSlug) return;
       app().appendTerminalOutput(data.text);
       app().setTerminalStatus('running');
     });
-    socket.on('terminal:closed' as any, () => app().setTerminalStatus('idle'));
+    socket.on('terminal:closed' as any, (data: any) => {
+      const currentSlug = useRouterStore.getState().projectSlug;
+      if (data?.projectSlug && data.projectSlug !== currentSlug) return;
+      app().setTerminalStatus('idle');
+    });
     socket.on('terminal:error' as any, (data: any) => {
+      const currentSlug = useRouterStore.getState().projectSlug;
+      if (data?.projectSlug && data.projectSlug !== currentSlug) return;
       app().appendTerminalOutput(`ERROR: ${data.message}`);
       app().setTerminalStatus('error');
     });

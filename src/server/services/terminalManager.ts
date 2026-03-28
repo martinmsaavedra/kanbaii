@@ -37,7 +37,9 @@ export function spawnPty(projectSlug: string, workingDir: string, opts?: { model
 
   const isWindows = process.platform === 'win32';
   const shell = isWindows ? 'cmd.exe' : '/bin/bash';
-  const claudeCmd = `claude${opts?.model ? ` --model ${opts.model}` : ''}`;
+  const validModels = ['opus', 'sonnet', 'haiku'];
+  const model = opts?.model && validModels.includes(opts.model) ? opts.model : undefined;
+  const claudeCmd = `claude${model ? ` --model ${model}` : ''}`;
   const shellArgs = isWindows ? ['/c', claudeCmd] : ['-c', claudeCmd];
 
   const cleanEnv = { ...process.env };

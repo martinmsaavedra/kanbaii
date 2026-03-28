@@ -163,6 +163,7 @@ interface AppStore {
   onTeamsStopped: (data: { message: string }) => void;
   onTeamsInputNeeded: (data: TeamsInputRequest) => void;
   clearTeamsInput: () => void;
+  resetTeams: () => void;
   // Coordinator AI events
   onCoordinatorThinking: (data: { text: string }) => void;
   onCoordinatorToolCall: (data: { tool: string; input: any }) => void;
@@ -276,6 +277,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   clearTeamsInput: () => set((s) => ({
     teams: { ...s.teams, inputNeeded: null },
   })),
+  resetTeams: () => set({ teams: { ...IDLE_TEAMS } }),
 
   // Coordinator AI events
   onCoordinatorThinking: (data) => set((s) => ({

@@ -63,6 +63,11 @@
     0 0 40px -12px rgba(99, 102, 241, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.03);
 
+  /* Console / Terminal */
+  --console-bg:       #06060a;
+  --console-fg:       #e8e8f0;
+  --console-cursor:   #6366f1;
+
   /* Inputs */
   --modal-bg:         #0a0a12;
   --modal-border:     rgba(148, 163, 242, 0.08);
@@ -122,6 +127,11 @@
 
   --shadow-card:      0 1px 3px rgba(0, 0, 20, 0.04), 0 0 0 1px rgba(0, 0, 30, 0.04);
   --shadow-card-hover: 0 4px 16px rgba(0, 0, 20, 0.06), 0 0 0 1px rgba(0, 0, 30, 0.06);
+
+  /* Console / Terminal */
+  --console-bg:       #f4f4f8;
+  --console-fg:       #1a1a2e;
+  --console-cursor:   #4f46e5;
 
   --modal-bg:         #ffffff;
   --modal-border:     rgba(0, 0, 30, 0.06);

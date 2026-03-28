@@ -32,6 +32,8 @@ import voiceRoutes from './routes/voice';
 import escalationRoutes from './routes/escalation';
 import plannerRoutes from './routes/planner';
 import { authMiddleware } from './lib/authMiddleware';
+import { requestLogger } from './lib/requestLogger';
+import { apiLimiter, authLimiter, executionLimiter, voiceLimiter } from './lib/rateLimiter';
 import { startPolling as startUsagePolling } from './services/claudeUsage';
 import { startSchedulerLoop } from './services/schedulerService';
 
@@ -43,22 +45,48 @@ export function createApp() {
   const httpServer = createServer(app);
 
   // Socket.IO
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5555',
+    `http://localhost:${PORT}`,
+  ];
+
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
-    cors: { origin: '*', methods: ['GET', 'POST', 'PATCH', 'DELETE'] },
+    cors: { origin: allowedOrigins, methods: ['GET', 'POST', 'PATCH', 'DELETE'] },
     serveClient: false,
   });
   setIO(io);
 
   // Middleware
-  app.use(cors());
-  app.use(express.json());
+  app.use(cors({ origin: allowedOrigins }));
+  app.use(express.json({ limit: '2mb' }));
+  app.use(requestLogger);
 
   // Auth middleware (only enforces when enabled in settings)
   app.use(authMiddleware);
 
+  // Rate limiting
+  app.use('/api/', apiLimiter);
+  app.use('/api/auth', authLimiter);
+  app.use('/api/ralph/start', executionLimiter);
+  app.use('/api/teams/start', executionLimiter);
+  app.use('/api/voice', voiceLimiter);
+
   // Health
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, version: '0.1.0', uptime: process.uptime() });
+    const mem = process.memoryUsage();
+    res.json({
+      ok: true,
+      version: require('../../package.json').version,
+      uptime: Math.floor(process.uptime()),
+      memory: {
+        heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+        heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
+        rssMB: Math.round(mem.rss / 1024 / 1024),
+      },
+      node: process.version,
+      platform: process.platform,
+    });
   });
 
   // API Routes
@@ -82,6 +110,12 @@ export function createApp() {
   app.use('/api/voice', voiceRoutes);
   app.use('/api/escalation', escalationRoutes);
   app.use('/api/planner', plannerRoutes);
+
+  // Global error handler — catches unhandled errors in routes
+  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error('[server] Unhandled error:', err.message);
+    res.status(500).json({ ok: false, error: 'Internal server error' });
+  });
 
   // Static frontend (production)
   // Dashboard path: works in both dev (src/server/) and prod (dist/server/)
@@ -149,7 +183,7 @@ export function createApp() {
 
 // Start server when run directly
 if (require.main === module) {
-  const { httpServer, watcher } = createApp();
+  const { httpServer, io, watcher } = createApp();
 
   watcher.start();
   startUsagePolling(60000);
@@ -159,11 +193,32 @@ if (require.main === module) {
     console.log(`\n  ⬡ KANBAII server running on http://localhost:${PORT}\n`);
   });
 
-  // Graceful shutdown
+  // Graceful shutdown (guarded against multiple calls)
+  let _shuttingDown = false;
   const shutdown = () => {
+    if (_shuttingDown) { process.exit(1); return; } // Second Ctrl+C = force kill
+    _shuttingDown = true;
     console.log('\n  Shutting down...');
+
+    // Stop background services FIRST (prevents new work)
+    try { require('./services/claudeUsage').stopPolling(); } catch {}
+    try { require('./services/schedulerService').stopSchedulerLoop(); } catch {}
+
+    // Stop active executions
+    try { require('./engines/coordinator').stopCoordinator(); } catch {}
+    try { require('./engines/workerPool').stopAllWorkers(); } catch {}
+    try { require('./engines/ralph').stopRalph(); } catch {}
+
     watcher.stop();
-    httpServer.close(() => process.exit(0));
+    io.close();
+
+    httpServer.close(() => {
+      console.log('  Server closed.');
+      process.exit(0);
+    });
+
+    // Force exit after 3 seconds
+    setTimeout(() => { console.log('  Force exit.'); process.exit(1); }, 3000).unref();
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);

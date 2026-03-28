@@ -184,9 +184,9 @@ function OutputPanel({ output, isRunning }: { output: string[]; isRunning: boole
       </div>
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto bg-[#06060a] border border-border rounded-md p-3 px-4
+        className="flex-1 overflow-y-auto bg-[var(--console-bg)] border border-border rounded-md p-3 px-4
                     font-mono text-[11px] leading-[1.7] text-text-muted
-                    shadow-[inset_0_2px_6px_rgba(0,0,0,0.3)]"
+                    shadow-[inset_0_2px_6px_rgba(0,0,0,0.1)]"
       >
         {output.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 opacity-20">

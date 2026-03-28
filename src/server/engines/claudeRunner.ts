@@ -65,10 +65,17 @@ export class ClaudeRunner extends EventEmitter {
       this.proc = spawn('claude', args, {
         cwd: workingDir,
         stdio: ['pipe', 'pipe', 'pipe'],
-        timeout,
         env: { ...process.env },
         windowsHide: true,
       });
+
+      // Manual timeout — spawn's timeout option doesn't actually kill the process
+      const timeoutTimer = setTimeout(() => {
+        if (this.proc && !this.killed) {
+          console.warn(`[claude-runner] Process timeout after ${timeout}ms, killing`);
+          this.stop();
+        }
+      }, timeout);
 
       let stdout = '', stderr = '', lineBuf = '', resultText = '';
 
@@ -97,6 +104,7 @@ export class ClaudeRunner extends EventEmitter {
       });
 
       this.proc.on('close', (code) => {
+        clearTimeout(timeoutTimer);
         if (lineBuf.trim()) {
           try { this.handleEvent(JSON.parse(lineBuf.trim())); } catch {}
         }
@@ -104,7 +112,7 @@ export class ClaudeRunner extends EventEmitter {
         resolve({ exitCode: code ?? 1, stdout: resultText || stdout.trim(), stderr: stderr.trim(), duration: Date.now() - startTime });
       });
 
-      this.proc.on('error', (err) => { this.proc = null; reject(err); });
+      this.proc.on('error', (err) => { clearTimeout(timeoutTimer); this.proc = null; reject(err); });
 
       // Write prompt and close stdin — Claude CLI -p mode needs EOF to start processing.
       // MCP tools communicate via their OWN stdio pipes, not through the main process stdin.

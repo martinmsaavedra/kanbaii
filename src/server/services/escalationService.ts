@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { emit } from '../lib/typedEmit';
 import { sendMessageWithReplyKeyboard, waitForTelegramReply } from './telegramService';
 import { getSection } from './settingsService';
@@ -38,7 +39,7 @@ export function createEscalation(data: {
   timeoutSeconds?: number;
 }): Escalation {
   const escalation: Escalation = {
-    id: `esc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: `esc-${crypto.randomBytes(12).toString('hex')}`,
     source: sourceOverride || data.source,
     taskId: data.taskId,
     taskTitle: data.taskTitle,

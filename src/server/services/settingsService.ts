@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { encrypt, decrypt, isEncrypted } from '../lib/secretsEncryption';
 
 const DATA_DIR = path.resolve(process.env.KANBAII_DATA_DIR || path.join(process.cwd(), 'data', 'projects'));
 const SETTINGS_FILE = path.join(DATA_DIR, '..', '.settings.json');
@@ -93,7 +94,18 @@ export function getSettings(): AppSettings {
   try {
     if (fs.existsSync(SETTINGS_FILE)) {
       const saved = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
-      return deepMerge(DEFAULTS, saved);
+      const settings = deepMerge(DEFAULTS, saved);
+      // Auto-decrypt sensitive fields
+      if (settings.integrations.telegram.botToken) {
+        try { settings.integrations.telegram.botToken = decrypt(settings.integrations.telegram.botToken); } catch {}
+      }
+      if (settings.integrations.voice.openaiApiKey) {
+        try { settings.integrations.voice.openaiApiKey = decrypt(settings.integrations.voice.openaiApiKey); } catch {}
+      }
+      if (settings.auth.secret && isEncrypted(settings.auth.secret)) {
+        try { settings.auth.secret = decrypt(settings.auth.secret); } catch {}
+      }
+      return settings;
     }
   } catch {}
   return { ...DEFAULTS };
@@ -104,7 +116,18 @@ export function updateSettings(partial: Partial<AppSettings>): AppSettings {
   const merged = deepMerge(current, partial);
   const dir = path.dirname(SETTINGS_FILE);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2), 'utf-8');
+  // Auto-encrypt sensitive fields before saving
+  const toSave = JSON.parse(JSON.stringify(merged)); // deep clone
+  if (toSave.integrations?.telegram?.botToken && !isEncrypted(toSave.integrations.telegram.botToken)) {
+    toSave.integrations.telegram.botToken = encrypt(toSave.integrations.telegram.botToken);
+  }
+  if (toSave.integrations?.voice?.openaiApiKey && !isEncrypted(toSave.integrations.voice.openaiApiKey)) {
+    toSave.integrations.voice.openaiApiKey = encrypt(toSave.integrations.voice.openaiApiKey);
+  }
+  if (toSave.auth?.secret && !isEncrypted(toSave.auth.secret)) {
+    toSave.auth.secret = encrypt(toSave.auth.secret);
+  }
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(toSave, null, 2), 'utf-8');
   return merged;
 }
 

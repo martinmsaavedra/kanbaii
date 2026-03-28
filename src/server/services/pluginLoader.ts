@@ -61,6 +61,28 @@ export function scanPlugins(): PluginEntry[] {
   for (const file of files) {
     try {
       const fullPath = path.join(PLUGINS_DIR, file);
+
+      // Validate plugin is within plugins directory
+      const resolvedPath = path.resolve(fullPath);
+      if (!resolvedPath.startsWith(path.resolve(PLUGINS_DIR))) {
+        console.warn(`[plugins] Rejected plugin outside plugins dir: ${file}`);
+        continue;
+      }
+
+      // Check for dangerous patterns
+      const content = fs.readFileSync(fullPath, 'utf-8');
+      const dangerousPatterns = [
+        /child_process/,
+        /require\s*\(\s*['"]fs['"]\s*\)/,
+        /process\.exit/,
+        /eval\s*\(/,
+        /Function\s*\(/,
+      ];
+      const hasDangerous = dangerousPatterns.some(p => p.test(content));
+      if (hasDangerous) {
+        console.warn(`[plugins] Plugin ${file} uses restricted APIs — loading with warning`);
+      }
+
       // Clear require cache for hot-reload
       delete require.cache[require.resolve(fullPath)];
       const mod = require(fullPath);

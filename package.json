@@ -29,8 +29,18 @@
   },
   "main": "./dist/server/index.js",
   "files": [
-    "dist/",
-    "dashboard/"
+    "dist/cli/",
+    "dist/server/engines/",
+    "dist/server/lib/",
+    "dist/server/mcp/",
+    "dist/server/routes/",
+    "dist/server/services/",
+    "dist/server/index.js",
+    "dist/server/index.d.ts",
+    "dist/shared/",
+    "dashboard/",
+    "LICENSE",
+    "README.md"
   ],
   "engines": {
     "node": ">=18.0.0"
@@ -44,7 +54,7 @@
     "build:frontend": "cd frontend && npm ci && npm run build && node -e \"const fs=require('fs');fs.rmSync('../dashboard',{recursive:true,force:true});fs.cpSync('out','../dashboard',{recursive:true});\"",
     "build": "tsc -p tsconfig.cli.json && npm run build:frontend",
     "postbuild": "node -e \"require('fs').chmodSync('dist/cli/index.js', '755')\"",
-    "prepublishOnly": "tsc -p tsconfig.cli.json",
+    "prepublishOnly": "tsc -p tsconfig.build.json",
     "start": "node dist/server/index.js",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -55,6 +65,7 @@
     "commander": "^12.1.0",
     "cors": "^2.8.5",
     "express": "^4.21.0",
+    "express-rate-limit": "^8.3.1",
     "socket.io": "^4.7.5",
     "zod": "^3.25.76"
   },

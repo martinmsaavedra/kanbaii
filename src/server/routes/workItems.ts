@@ -51,6 +51,16 @@ router.patch('/:wiId', (req: Request, res: Response) => {
   }
 });
 
+// POST /api/projects/:slug/work-items/:wiId/reorder
+router.post('/:wiId/reorder', (req: Request, res: Response) => {
+  const { order } = req.body;
+  if (typeof order !== 'number') return res.status(400).json({ ok: false, error: 'order (number) required' });
+  const item = workItemStore.reorderWorkItem(req.params.slug, req.params.wiId, order);
+  if (!item) return res.status(404).json({ ok: false, error: 'Work item not found' });
+  emit('workItem:updated', { projectSlug: req.params.slug, workItem: item });
+  res.json({ ok: true, data: item });
+});
+
 // DELETE /api/projects/:slug/work-items/:wiId
 router.delete('/:wiId', (req: Request, res: Response) => {
   try {

@@ -8,11 +8,11 @@ import { motion } from 'framer-motion';
 interface TabDef { key: ViewTab; label: string; icon: React.ReactNode; shortcut: string }
 
 const PROJECT_TABS: TabDef[] = [
+  { key: 'planner',    label: 'Planner',    icon: <Sparkles size={15} />,  shortcut: 'P' },
   { key: 'work-items', label: 'Work Items', icon: <LayoutGrid size={15} />, shortcut: 'W' },
   { key: 'console',    label: 'Console',    icon: <Terminal size={15} />,   shortcut: 'C' },
   { key: 'teams',      label: 'Teams',      icon: <Users size={15} />,     shortcut: 'T' },
   { key: 'soul',       label: 'Soul',       icon: <Eye size={15} />,       shortcut: 'S' },
-  { key: 'planner',   label: 'Planner',   icon: <Sparkles size={15} />,  shortcut: 'P' },
 ];
 
 const WORK_ITEM_TABS: TabDef[] = [

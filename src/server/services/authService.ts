@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { getSection } from './settingsService';
+import { getSection, updateSection } from './settingsService';
 
 const DATA_DIR = path.resolve(process.env.KANBAII_DATA_DIR || path.join(process.cwd(), 'data', 'projects'));
 const USERS_FILE = path.join(DATA_DIR, '..', '.users.json');
@@ -37,7 +37,12 @@ function generateSalt(): string {
 
 function getSecret(): string {
   const auth = getSection('auth');
-  return auth.secret || 'kanbaii-default-secret-change-me';
+  if (!auth.secret || auth.secret === 'kanbaii-default-secret-change-me') {
+    const generated = crypto.randomBytes(32).toString('hex');
+    updateSection('auth', { secret: generated });
+    return generated;
+  }
+  return auth.secret;
 }
 
 function base64url(str: string): string {
@@ -86,6 +91,9 @@ export function isAuthEnabled(): boolean {
 }
 
 export function register(username: string, password: string): { user: Omit<User, 'passwordHash' | 'salt'>; token: string } {
+  if (password.length < 8) {
+    throw new Error('Password must be at least 8 characters');
+  }
   const users = readUsers();
   if (users.find(u => u.username === username)) {
     throw new Error('Username already exists');

@@ -67,6 +67,7 @@ export interface WorkItem {
   title: string;
   category: WorkItemCategory;
   status: WorkItemStatus;
+  order?: number;                    // Position within status column (lower = higher)
   linkedWorkItem?: string | null;   // ID of related work item (for bugs/refactors)
   plan: Plan;
   columns: Record<TaskColumnName, Task[]>;

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Plus, Pencil, Sparkles } from 'lucide-react';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import { useWorkItemStore, WorkItem } from '@/stores/workItemStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useRouterStore } from '@/stores/routerStore';
@@ -42,11 +43,16 @@ function timeAgo(date: string): string {
   return `${days}d ago`;
 }
 
-// --- Draggable Work Item Card ---
+// --- Draggable + Drop Target Work Item Card ---
 
-function WICard({ wi, projectSlug, onClick, onEdit, index = 0 }: { wi: WorkItem; projectSlug: string; onClick: () => void; onEdit: () => void; index?: number }) {
+function WICard({ wi, projectSlug, onClick, onEdit, index = 0, columnKey, onReorder }: {
+  wi: WorkItem; projectSlug: string; onClick: () => void; onEdit: () => void;
+  index?: number; columnKey: string;
+  onReorder: (wiSlug: string, fromColumn: string, fromIndex: number, toColumn: string, toIndex: number) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [closestEdge, setClosestEdge] = useState<string | null>(null);
   const [flash, setFlash] = useState(false);
   const cat = CATEGORIES[wi.category];
   const progress = getProgress(wi);
@@ -54,13 +60,43 @@ function WICard({ wi, projectSlug, onClick, onEdit, index = 0 }: { wi: WorkItem;
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    return draggable({
+
+    const dragCleanup = draggable({
       element: el,
-      getInitialData: () => ({ type: 'work-item', wiId: wi.id, wiSlug: wi.slug, currentStatus: wi.status }),
+      getInitialData: () => ({ type: 'work-item', wiId: wi.id, wiSlug: wi.slug, currentStatus: columnKey, index }),
       onDragStart: () => setDragging(true),
       onDrop: () => setDragging(false),
     });
-  }, [wi.id, wi.slug, wi.status]);
+
+    const dropCleanup = dropTargetForElements({
+      element: el,
+      getData: ({ input, element }) => {
+        return attachClosestEdge(
+          { type: 'work-item-card', wiId: wi.id, wiSlug: wi.slug, columnKey, index },
+          { input, element, allowedEdges: ['top', 'bottom'] }
+        );
+      },
+      canDrop: ({ source }) => source.data.type === 'work-item' && source.data.wiId !== wi.id,
+      onDragEnter: ({ self }) => setClosestEdge(extractClosestEdge(self.data)),
+      onDrag: ({ self }) => setClosestEdge(extractClosestEdge(self.data)),
+      onDragLeave: () => setClosestEdge(null),
+      onDrop: ({ source, self }) => {
+        setClosestEdge(null);
+        const edge = extractClosestEdge(self.data);
+        const sourceColumn = source.data.currentStatus as string;
+        const sourceIndex = source.data.index as number;
+        let targetIndex = index;
+        if (edge === 'bottom') targetIndex = index + 1;
+
+        // Same-column adjustment
+        if (sourceColumn === columnKey && sourceIndex < targetIndex) targetIndex--;
+
+        onReorder(source.data.wiSlug as string, sourceColumn, sourceIndex, columnKey, targetIndex);
+      },
+    });
+
+    return () => { dragCleanup(); dropCleanup(); };
+  }, [wi.id, wi.slug, columnKey, index, onReorder]);
 
   // Flash on status change
   const prevStatus = useRef(wi.status);
@@ -74,78 +110,83 @@ function WICard({ wi, projectSlug, onClick, onEdit, index = 0 }: { wi: WorkItem;
   }, [wi.status]);
 
   return (
-    <div
-      ref={ref}
-      className={[
-        'group/card flex bg-card border border-border rounded-md cursor-pointer shadow-card',
-        'transition-all duration-250 ease-out-expo overflow-hidden animate-stagger-in',
-        'relative',
-        'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[3px] before:rounded-l-md before:bg-[var(--cat-color)]',
-        'hover:-translate-y-[3px] hover:shadow-card-hover hover:border-border-light',
-        dragging ? 'opacity-20 scale-95 rotate-[2deg] shadow-drag' : '',
-        flash ? 'animate-post-move' : '',
-      ].join(' ')}
-      style={{
-        '--cat-color': cat.color,
-        animationDelay: `${index * 60}ms`,
-      } as React.CSSProperties}
-      onClick={onClick}
-    >
-      <div className="flex-1 p-3 pl-3.5 min-w-0">
-        {/* Header: icon + title + badge + edit */}
-        <div className="flex items-center gap-2 mb-2">
-          <span
-            className="shrink-0 text-body drop-shadow-[0_0_4px_currentColor]"
-            style={{ color: cat.color }}
-          >
-            {cat.icon}
-          </span>
-          <span className="flex-1 text-body font-medium text-text overflow-hidden text-ellipsis whitespace-nowrap tracking-[-0.01em]">
-            {wi.title}
-          </span>
-          <button
-            className="inline-flex items-center justify-center w-5 h-5 rounded-xs text-text-muted opacity-0 transition-all duration-150 ease-out-expo group-hover/card:opacity-100 hover:bg-surface-hover hover:text-accent"
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            title="Edit"
-          >
-            <Pencil size={11} />
-          </button>
-          <span className={`badge badge-${wi.category}`}>{cat.label}</span>
-        </div>
+    <div className="relative">
+      {/* Top edge indicator */}
+      {closestEdge === 'top' && (
+        <div className="absolute -top-[2px] left-1 right-1 h-[3px] rounded-full bg-accent z-10 shadow-[0_0_8px_rgba(99,102,241,0.4)]" />
+      )}
 
-        {/* Plan excerpt */}
-        {wi.plan.content ? (
-          <div className="text-[10.5px] text-text-muted leading-[1.5] line-clamp-2 mb-2.5">
-            {wi.plan.content}
+      <div
+        ref={ref}
+        className={[
+          'group/card flex bg-card border border-border rounded-md cursor-pointer shadow-card',
+          'transition-all duration-250 ease-out-expo overflow-hidden animate-stagger-in',
+          'relative',
+          'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[3px] before:rounded-l-md before:bg-[var(--cat-color)]',
+          'hover:-translate-y-[3px] hover:shadow-card-hover hover:border-border-light',
+          dragging ? 'opacity-20 scale-95 rotate-[2deg] shadow-drag' : '',
+          flash ? 'animate-post-move' : '',
+        ].join(' ')}
+        style={{
+          '--cat-color': cat.color,
+          animationDelay: `${index * 60}ms`,
+        } as React.CSSProperties}
+        onClick={onClick}
+      >
+        <div className="flex-1 p-3 pl-3.5 min-w-0">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="shrink-0 text-body drop-shadow-[0_0_4px_currentColor]" style={{ color: cat.color }}>
+              {cat.icon}
+            </span>
+            <span className="flex-1 text-body font-medium text-text overflow-hidden text-ellipsis whitespace-nowrap tracking-[-0.01em]">
+              {wi.title}
+            </span>
+            <button
+              className="inline-flex items-center justify-center w-5 h-5 rounded-xs text-text-muted opacity-0 transition-all duration-150 ease-out-expo group-hover/card:opacity-100 hover:bg-surface-hover hover:text-accent"
+              onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              title="Edit"
+            >
+              <Pencil size={11} />
+            </button>
+            <span className={`badge badge-${wi.category}`}>{cat.label}</span>
           </div>
-        ) : (
-          <div className="text-[10.5px] text-text-muted leading-[1.5] line-clamp-2 mb-2.5 italic opacity-40">
-            No plan yet
-          </div>
-        )}
 
-        {/* Progress bar + percentage */}
-        <div className="flex items-center gap-2 mb-2">
-          <div className="flex-1 h-[3px] rounded-[3px] bg-[rgba(148,163,242,0.06)] overflow-hidden">
-            <div
-              className="h-full rounded-[3px] transition-[width] duration-[800ms] ease-out-expo"
-              style={{ width: `${progress.percent}%`, background: cat.color }}
-            />
-          </div>
-          <span className="text-data font-semibold text-text-secondary font-mono min-w-[28px] text-right">
-            {progress.percent}%
-          </span>
-          <span className="text-xxs text-text-muted font-mono">
-            {progress.completed}/{progress.total}
-          </span>
-        </div>
+          {wi.plan.content ? (
+            <div className="text-[10.5px] text-text-muted leading-[1.5] line-clamp-2 mb-2.5">
+              {wi.plan.content}
+            </div>
+          ) : (
+            <div className="text-[10.5px] text-text-muted leading-[1.5] line-clamp-2 mb-2.5 italic opacity-40">
+              No plan yet
+            </div>
+          )}
 
-        {/* Footer: linked + time */}
-        <div className="flex items-center gap-2 text-data text-text-muted font-mono">
-          {wi.linkedWorkItem && <span className="text-accent-dim">&rarr; {wi.linkedWorkItem}</span>}
-          <span className="ml-auto">{timeAgo(wi.updatedAt)}</span>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="flex-1 h-[3px] rounded-[3px] bg-[rgba(148,163,242,0.06)] overflow-hidden">
+              <div
+                className="h-full rounded-[3px] transition-[width] duration-[800ms] ease-out-expo"
+                style={{ width: `${progress.percent}%`, background: cat.color }}
+              />
+            </div>
+            <span className="text-data font-semibold text-text-secondary font-mono min-w-[28px] text-right">
+              {progress.percent}%
+            </span>
+            <span className="text-xxs text-text-muted font-mono">
+              {progress.completed}/{progress.total}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-data text-text-muted font-mono">
+            {wi.linkedWorkItem && <span className="text-accent-dim">&rarr; {wi.linkedWorkItem}</span>}
+            <span className="ml-auto">{timeAgo(wi.updatedAt)}</span>
+          </div>
         </div>
       </div>
+
+      {/* Bottom edge indicator */}
+      {closestEdge === 'bottom' && (
+        <div className="absolute -bottom-[2px] left-1 right-1 h-[3px] rounded-full bg-accent z-10 shadow-[0_0_8px_rgba(99,102,241,0.4)]" />
+      )}
     </div>
   );
 }
@@ -160,6 +201,7 @@ function WIColumn({
   onCardClick,
   onCardEdit,
   onDrop,
+  onReorder,
 }: {
   columnKey: string;
   label: string;
@@ -168,6 +210,7 @@ function WIColumn({
   onCardClick: (wi: WorkItem) => void;
   onCardEdit: (wi: WorkItem) => void;
   onDrop: (wiSlug: string, newStatus: string) => void;
+  onReorder: (wiSlug: string, fromColumn: string, fromIndex: number, toColumn: string, toIndex: number) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [over, setOver] = useState(false);
@@ -218,6 +261,8 @@ function WIColumn({
               onClick={() => onCardClick(wi)}
               onEdit={() => onCardEdit(wi)}
               index={index}
+              columnKey={columnKey}
+              onReorder={onReorder}
             />
           ))
         )}
@@ -267,6 +312,25 @@ export function WorkItemsBoard({ projectSlug }: Props) {
     }
   }, [projectSlug, fetchWorkItems]);
 
+  const handleReorder = useCallback(async (wiSlug: string, fromColumn: string, fromIndex: number, toColumn: string, toIndex: number) => {
+    try {
+      if (fromColumn !== toColumn) {
+        // Cross-column move: update status + set order
+        await api.updateWorkItem(projectSlug, wiSlug, { status: toColumn });
+      }
+      // Reorder: assign the target index as the order
+      const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5555';
+      await fetch(`${API}/api/projects/${projectSlug}/work-items/${wiSlug}/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: toIndex }),
+      });
+      fetchWorkItems(projectSlug);
+    } catch (err) {
+      console.error('Failed to reorder work item:', err);
+    }
+  }, [projectSlug, fetchWorkItems]);
+
   if (loading && workItems.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-text-muted text-label font-mono tracking-[0.04em] animate-breathe">
@@ -285,44 +349,31 @@ export function WorkItemsBoard({ projectSlug }: Props) {
           <div className="text-data text-text-muted flex gap-3 items-center font-mono">
             {stats.feature > 0 && (
               <span>
-                <span
-                  className="inline-block w-[5px] h-[5px] rounded-full mr-1 shadow-[0_0_6px_currentColor]"
-                  style={{ background: CATEGORIES.feature.color }}
-                />
+                <span className="inline-block w-[5px] h-[5px] rounded-full mr-1 shadow-[0_0_6px_currentColor]" style={{ background: CATEGORIES.feature.color }} />
                 {stats.feature} feature{stats.feature !== 1 ? 's' : ''}
               </span>
             )}
             {stats.bug > 0 && (
               <span>
-                <span
-                  className="inline-block w-[5px] h-[5px] rounded-full mr-1 shadow-[0_0_6px_currentColor]"
-                  style={{ background: CATEGORIES.bug.color }}
-                />
+                <span className="inline-block w-[5px] h-[5px] rounded-full mr-1 shadow-[0_0_6px_currentColor]" style={{ background: CATEGORIES.bug.color }} />
                 {stats.bug} bug{stats.bug !== 1 ? 's' : ''}
               </span>
             )}
             {stats.refactor > 0 && (
               <span>
-                <span
-                  className="inline-block w-[5px] h-[5px] rounded-full mr-1 shadow-[0_0_6px_currentColor]"
-                  style={{ background: CATEGORIES.refactor.color }}
-                />
+                <span className="inline-block w-[5px] h-[5px] rounded-full mr-1 shadow-[0_0_6px_currentColor]" style={{ background: CATEGORIES.refactor.color }} />
                 {stats.refactor} refactor{stats.refactor !== 1 ? 's' : ''}
               </span>
             )}
-            {workItems.length === 0 && (
-              <span>No work items</span>
-            )}
+            {workItems.length === 0 && <span>No work items</span>}
           </div>
         </div>
         <div className="flex gap-2">
           <button className="btn-ghost" onClick={() => setShowCreate(true)}>
-            <Plus size={16} />
-            Quick
+            <Plus size={16} /> Quick
           </button>
           <button className="btn-primary" onClick={() => setView('planner')}>
-            <Sparkles size={16} />
-            Planner
+            <Sparkles size={16} /> Planner
           </button>
         </div>
       </div>
@@ -338,24 +389,17 @@ export function WorkItemsBoard({ projectSlug }: Props) {
             onCardClick={(wi) => goToWorkItem(projectSlug, wi.slug)}
             onCardEdit={(wi) => setEditingWI(wi)}
             onDrop={handleDrop}
+            onReorder={handleReorder}
           />
         ))}
       </div>
 
       {showCreate && (
-        <CreateWorkItemModal
-          projectSlug={projectSlug}
-          onClose={() => setShowCreate(false)}
-        />
+        <CreateWorkItemModal projectSlug={projectSlug} onClose={() => setShowCreate(false)} />
       )}
 
-
       {editingWI && (
-        <EditWorkItemModal
-          projectSlug={projectSlug}
-          workItem={editingWI}
-          onClose={() => setEditingWI(null)}
-        />
+        <EditWorkItemModal projectSlug={projectSlug} workItem={editingWI} onClose={() => setEditingWI(null)} />
       )}
     </div>
   );

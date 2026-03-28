@@ -3,6 +3,7 @@
  */
 
 import { suggestAgent, getAgent } from '../services/agentRegistry';
+import { sanitizeForPrompt } from '../lib/promptSanitizer';
 
 export interface TaskForRouting {
   id: string;
@@ -53,8 +54,8 @@ export function buildPrompt(
   }
 
   // Task details
-  parts.push(`# Task: ${task.title}`);
-  if (task.description) parts.push(`\n## Description\n${task.description}`);
+  parts.push(`# Task: ${sanitizeForPrompt(task.title)}`);
+  if (task.description) parts.push(`\n## Description\n${sanitizeForPrompt(task.description)}`);
 
   parts.push(`\n## Project Info`);
   parts.push(`- Project: ${projectTitle}`);

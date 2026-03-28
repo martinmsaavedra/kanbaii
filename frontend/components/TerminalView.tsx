@@ -71,16 +71,34 @@ export function TerminalView({ projectSlug }: { projectSlug: string }) {
 
       if (disposed || !termRef.current) return;
 
+      // Read theme from CSS variables for light/dark support
+      const styles = getComputedStyle(document.documentElement);
+      const consoleBg = styles.getPropertyValue('--console-bg').trim() || '#06060a';
+      const consoleFg = styles.getPropertyValue('--console-fg').trim() || '#e8e8f0';
+      const consoleCursor = styles.getPropertyValue('--console-cursor').trim() || '#6366f1';
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+
       term = new Terminal({
-        theme: {
-          background: '#06060a',
-          foreground: '#e8e8f0',
-          cursor: '#6366f1',
-          cursorAccent: '#06060a',
+        theme: isLight ? {
+          background: consoleBg,
+          foreground: consoleFg,
+          cursor: consoleCursor,
+          cursorAccent: consoleBg,
+          selectionBackground: 'rgba(79, 70, 229, 0.2)',
+          black: '#1a1a2e', red: '#dc2626', green: '#059669', yellow: '#d97706',
+          blue: '#4f46e5', magenta: '#9333ea', cyan: '#0891b2', white: '#1a1a2e',
+          brightBlack: '#6e6e82', brightRed: '#ef4444', brightGreen: '#10b981',
+          brightYellow: '#f59e0b', brightBlue: '#6366f1', brightMagenta: '#a855f7',
+          brightCyan: '#06b6d4', brightWhite: '#0f0f18',
+        } : {
+          background: consoleBg,
+          foreground: consoleFg,
+          cursor: consoleCursor,
+          cursorAccent: consoleBg,
           selectionBackground: 'rgba(99, 102, 241, 0.3)',
           black: '#06060a', red: '#f87171', green: '#34d399', yellow: '#fbbf24',
           blue: '#818cf8', magenta: '#c084fc', cyan: '#22d3ee', white: '#e8e8f0',
-          brightBlack: '#464654', brightRed: '#fca5a5', brightGreen: '#6ee7b7',
+          brightBlack: '#5c5c6e', brightRed: '#fca5a5', brightGreen: '#6ee7b7',
           brightYellow: '#fde68a', brightBlue: '#a5b4fc', brightMagenta: '#d8b4fe',
           brightCyan: '#67e8f9', brightWhite: '#ffffff',
         },
@@ -291,7 +309,7 @@ export function TerminalView({ projectSlug }: { projectSlug: string }) {
       </div>
 
       {/* Terminal area */}
-      <div className="flex-1 relative overflow-hidden bg-[var(--terminal-bg,#06060a)]">
+      <div className="flex-1 relative overflow-hidden bg-[var(--console-bg)]">
         <div ref={termRef} className="w-full h-full px-3 py-2" />
 
         {/* Command Palette Overlay */}

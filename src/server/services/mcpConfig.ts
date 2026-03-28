@@ -132,7 +132,7 @@ export async function testServer(name: string): Promise<{ ok: boolean; message: 
 
     const proc = spawn(server.command, server.args || [], {
       env: { ...process.env, ...server.env },
-      shell: true,
+      windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 

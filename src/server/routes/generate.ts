@@ -11,8 +11,7 @@ function callClaude(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = spawn('claude', ['-p', '--output-format', 'text'], {
       stdio: ['pipe', 'pipe', 'pipe'],
-      shell: true,
-      timeout: 120000,
+      windowsHide: true,
     });
 
     let stdout = '';

@@ -3,6 +3,7 @@ import path from 'path';
 import { Project } from '../../shared/types';
 import { CreateProjectDto, UpdateProjectDto, ProjectSchema } from '../lib/schemas';
 import { generateId, projectSlug } from '../lib/generateId';
+import { safePath } from '../lib/safePath';
 
 const DATA_DIR = path.resolve(process.env.KANBAII_DATA_DIR || path.join(process.cwd(), 'data', 'projects'));
 
@@ -13,7 +14,7 @@ function ensureDir(dir: string): void {
 }
 
 function projectDir(slug: string): string {
-  return path.join(DATA_DIR, slug);
+  return safePath(DATA_DIR, slug);
 }
 
 function projectFile(slug: string): string {

@@ -2,6 +2,7 @@
 
 import { listAgents } from '../services/agentRegistry';
 import { getDocument } from '../services/soulStore';
+import { sanitizeForPrompt } from '../lib/promptSanitizer';
 
 export function buildCoordinatorPrompt(opts: {
   projectSlug: string;
@@ -50,7 +51,7 @@ Your thinking is streamed to the human operator in real-time. Be clear about you
   // 4. Work Items
   parts.push(`\n## Work Items to Process`);
   for (const title of opts.workItemTitles) {
-    parts.push(`- ${title}`);
+    parts.push(`- ${sanitizeForPrompt(title)}`);
   }
 
   // 5. MCP Tools Reference

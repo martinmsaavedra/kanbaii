@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { WorkItem, Task, TaskColumnName, TASK_COLUMNS } from '../../shared/types';
+import { WorkItem, WorkItemStatus, Task, TaskColumnName, TASK_COLUMNS } from '../../shared/types';
 import {
   CreateWorkItemDto,
   UpdateWorkItemDto,
@@ -11,15 +11,16 @@ import {
 } from '../lib/schemas';
 import { generateId, slugify } from '../lib/generateId';
 import { CATEGORIES } from '../../shared/types';
+import { safePath } from '../lib/safePath';
 
 const DATA_DIR = path.resolve(process.env.KANBAII_DATA_DIR || path.join(process.cwd(), 'data', 'projects'));
 
 function workItemsDir(projectSlug: string): string {
-  return path.join(DATA_DIR, projectSlug, 'work-items');
+  return safePath(DATA_DIR, projectSlug, 'work-items');
 }
 
-function workItemFile(projectSlug: string, wiSlug: string): string {
-  return path.join(workItemsDir(projectSlug), `${wiSlug}.json`);
+function workItemFile(projectSlug: string, slug: string): string {
+  return safePath(DATA_DIR, projectSlug, 'work-items', `${slug}.json`);
 }
 
 function ensureDir(dir: string): void {
@@ -89,7 +90,7 @@ export function listWorkItems(projectSlug: string): WorkItem[] {
     const wi = readWorkItem(projectSlug, slug);
     if (wi) items.push(wi);
   }
-  return items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return items.sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export function getWorkItem(projectSlug: string, idOrSlug: string): WorkItem | null {
@@ -270,7 +271,12 @@ export function moveTask(
 
   wi.updatedAt = now;
   writeWorkItem(projectSlug, wi);
-  return wi;
+
+  // Auto-sync work item status based on task distribution
+  syncWorkItemStatus(projectSlug, wiIdOrSlug);
+
+  // Re-read after potential status change
+  return findWorkItemByIdOrSlug(projectSlug, wiIdOrSlug) || wi;
 }
 
 export function deleteTask(projectSlug: string, wiIdOrSlug: string, taskId: string): WorkItem {
@@ -305,31 +311,61 @@ export function activateWorkItemIfNeeded(projectSlug: string, wiIdOrSlug: string
 }
 
 /**
- * Check if all tasks in a work item are in 'review' or 'done' columns
- * (nothing left in backlog, todo, in-progress). If so, move status to 'review'.
- * Only promotes from 'active' → 'review', never from 'review' or 'done'.
+ * Auto-sync work item status based on task distribution:
+ * - active → review: when all tasks are in review or done (nothing in backlog/todo/in-progress)
+ * - review → done: when ALL tasks are in done column
+ * - review → active: if tasks move back to pending columns
  */
-export function promoteWorkItemIfComplete(projectSlug: string, wiIdOrSlug: string): WorkItem | null {
+export function syncWorkItemStatus(projectSlug: string, wiIdOrSlug: string): WorkItem | null {
   const wi = findWorkItemByIdOrSlug(projectSlug, wiIdOrSlug);
   if (!wi) return null;
-  if (wi.status !== 'active') return wi;
+  if (wi.status === 'planning' || wi.status === 'done') return wi;
 
-  const pendingCount =
-    wi.columns['backlog'].length +
-    wi.columns['todo'].length +
-    wi.columns['in-progress'].length;
+  const backlog = wi.columns['backlog'].length;
+  const todo = wi.columns['todo'].length;
+  const inProgress = wi.columns['in-progress'].length;
+  const review = wi.columns['review'].length;
+  const done = wi.columns['done'].length;
+  const total = backlog + todo + inProgress + review + done;
+  const pending = backlog + todo + inProgress;
 
-  const totalTasks =
-    pendingCount +
-    wi.columns['review'].length +
-    wi.columns['done'].length;
+  if (total === 0) return wi;
 
-  // Only promote if there are tasks and none are pending
-  if (totalTasks > 0 && pendingCount === 0) {
-    wi.status = 'review';
+  let newStatus: WorkItemStatus = wi.status;
+
+  if (done === total) {
+    // ALL tasks done → work item done
+    newStatus = 'done';
+  } else if (pending === 0) {
+    // No pending tasks (all in review/done) → work item review
+    newStatus = 'review';
+  } else if (wi.status === 'review' && pending > 0) {
+    // Tasks moved back to pending → revert to active
+    newStatus = 'active';
+  }
+
+  if (newStatus !== wi.status) {
+    wi.status = newStatus;
     wi.updatedAt = new Date().toISOString();
     writeWorkItem(projectSlug, wi);
   }
+  return wi;
+}
+
+/** @deprecated Use syncWorkItemStatus instead */
+export function promoteWorkItemIfComplete(projectSlug: string, wiIdOrSlug: string): WorkItem | null {
+  return syncWorkItemStatus(projectSlug, wiIdOrSlug);
+}
+
+/**
+ * Reorder a work item within its status column.
+ */
+export function reorderWorkItem(projectSlug: string, wiIdOrSlug: string, newOrder: number): WorkItem | null {
+  const wi = findWorkItemByIdOrSlug(projectSlug, wiIdOrSlug);
+  if (!wi) return null;
+  wi.order = newOrder;
+  wi.updatedAt = new Date().toISOString();
+  writeWorkItem(projectSlug, wi);
   return wi;
 }
 
