@@ -1,0 +1,41 @@
+name: Publish to npm
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - '.gitignore'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Install server dependencies
+      - run: npm ci
+
+      # Build server + CLI (production, no source maps)
+      - run: npx tsc -p tsconfig.build.json
+
+      # Install frontend dependencies + build
+      - run: cd frontend && npm ci && npm run build
+
+      # Copy frontend build to dashboard/
+      - run: rm -rf dashboard && cp -r frontend/out dashboard
+
+      # Publish to npm
+      - run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

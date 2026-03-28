@@ -1,6 +1,6 @@
 {
   "name": "kanbaii",
-  "version": "0.1.3",
+  "version": "0.2.1",
   "description": "AI-native kanban board for software development. Hierarchical project management with Claude AI integration.",
   "keywords": [
     "kanban",
@@ -54,7 +54,7 @@
     "build:frontend": "cd frontend && npm ci && npm run build && node -e \"const fs=require('fs');fs.rmSync('../dashboard',{recursive:true,force:true});fs.cpSync('out','../dashboard',{recursive:true});\"",
     "build": "tsc -p tsconfig.cli.json && npm run build:frontend",
     "postbuild": "node -e \"require('fs').chmodSync('dist/cli/index.js', '755')\"",
-    "prepublishOnly": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "echo 'Build handled by CI'",
     "start": "node dist/server/index.js",
     "test": "vitest run",
     "test:watch": "vitest"
