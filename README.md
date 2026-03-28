@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/kanbaii-v0.1.0-6366f1?style=for-the-badge&labelColor=0a0a0b" alt="Version" />
+  <img src="https://img.shields.io/badge/kanbaii-v0.2.0-6366f1?style=for-the-badge&labelColor=0a0a0b" alt="Version" />
   <img src="https://img.shields.io/badge/node-%3E%3D18-22c55e?style=for-the-badge&labelColor=0a0a0b" alt="Node" />
   <img src="https://img.shields.io/badge/license-MIT-71717a?style=for-the-badge&labelColor=0a0a0b" alt="License" />
   <img src="https://img.shields.io/badge/AI-Claude-f59e0b?style=for-the-badge&labelColor=0a0a0b" alt="Claude AI" />
@@ -61,16 +61,49 @@ If you've ever felt overwhelmed by everything you need to do, KANBAII turns that
 
 ## Quick Start
 
-```bash
-# Run instantly (no install needed)
-npx kanbaii
+### 1. Prerequisites
 
-# Or install globally
-npm install -g kanbaii
-kanbaii start
+You need [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated:
+
+```bash
+npm install -g @anthropic-ai/claude-code
+claude login
 ```
 
-No Docker. No database. No config files. Just JSON on your machine.
+### 2. Install & Run
+
+```bash
+npm install -g kanbaii
+kanbaii doctor          # verify everything works
+kanbaii start           # opens browser at localhost:5555
+```
+
+Or without installing: `npx kanbaii start`
+
+### 3. Create Your First Project
+
+1. Click **+ New** in the sidebar
+2. Name your project (e.g., "My App")
+3. Set the **working directory** — the folder where your code lives
+
+### 4. Plan with AI
+
+1. Go to the **Planner** tab
+2. Describe what you want to build in plain language
+3. AI generates work items with plans and tasks
+4. Review, edit, approve — your board is populated
+
+### 5. Execute
+
+**Manual**: Drag tasks across columns as you work.
+
+**Ralph** (single work item): Click a work item → Ralph tab → Play. Claude executes tasks sequentially, asks you questions when blocked.
+
+**Teams** (multiple work items): Go to Teams tab → select work items → Start. The AI coordinator assigns tasks to workers in parallel.
+
+### 6. That's It
+
+Your data lives in `./data/projects/` as clean JSON files. No cloud, no accounts. Stop the server with Ctrl+C.
 
 ---
 
@@ -145,10 +178,13 @@ Select multiple work items. A coordinator assigns each to a worker. Workers exec
 ## CLI
 
 ```bash
-kanbaii start          # Start the server
-kanbaii stop           # Graceful shutdown
-kanbaii status         # Health check
+kanbaii start          # Start the server (opens browser)
+kanbaii start -p 8080  # Custom port
+kanbaii start --no-open # Don't open browser
+kanbaii doctor         # Check Claude CLI, Node, auth, dependencies
+kanbaii status         # Health check (is server running?)
 kanbaii init           # Initialize data directory
+kanbaii stop           # Info for stopping the server
 ```
 
 ### Configuration

@@ -11,6 +11,7 @@ import { TerminalView } from '@/components/TerminalView';
 import { SoulView } from '@/components/SoulView';
 import { PlannerView } from '@/components/PlannerView';
 import { ViewSwitcher } from '@/components/ViewSwitcher';
+import { ScheduleBar } from '@/components/ScheduleBar';
 import { WelcomeLanding } from '@/components/WelcomeLanding';
 
 function Breadcrumb() {
@@ -87,6 +88,7 @@ export default function Home() {
         <div className="flex items-center px-4 py-2 border-b border-border flex-shrink-0 bg-bg gap-4">
           <Breadcrumb />
           <ViewSwitcher />
+          <ScheduleBar />
         </div>
         <div className="flex-1 overflow-hidden">
           {renderProjectView()}
