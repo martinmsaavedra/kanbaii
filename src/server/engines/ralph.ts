@@ -108,9 +108,15 @@ export async function startRalph(config: RalphConfig): Promise<void> {
     currentRunner = runner;
 
     let output = '';
+    let costData = { costUsd: 0, inputTokens: 0, outputTokens: 0 };
+
     runner.on('output', (chunk: string) => {
       output += chunk;
       emit('ralph:output', { taskId: task.id, message: chunk });
+    });
+
+    runner.on('cost', (data: { costUsd: number; inputTokens: number; outputTokens: number }) => {
+      costData = data;
     });
 
     runner.on('escalation', (data: { tool: string; question: string; input: any }) => {
@@ -153,9 +159,12 @@ export async function startRalph(config: RalphConfig): Promise<void> {
           recordExecution({
             projectSlug, workItemSlug, taskId: task.id, taskTitle: task.title,
             model: task.model || 'sonnet', duration: result.duration,
-            inputTokens: 0, outputTokens: 0, cacheTokens: 0, status: 'success',
+            inputTokens: costData.inputTokens, outputTokens: costData.outputTokens,
+            cacheTokens: 0, costUsd: costData.costUsd, status: 'success',
           });
-        } catch {}
+        } catch (err) {
+          console.error('[ralph] Failed to record execution cost:', (err as Error).message);
+        }
 
         // Broadcast update
         const updatedWI = workItemStore.getWorkItem(projectSlug, workItemSlug);
@@ -168,6 +177,18 @@ export async function startRalph(config: RalphConfig): Promise<void> {
         });
         runStore.taskFailed();
         consecutiveErrors++;
+
+        // Cost tracking for failed tasks too
+        try {
+          recordExecution({
+            projectSlug, workItemSlug, taskId: task.id, taskTitle: task.title,
+            model: task.model || 'sonnet', duration: result.duration,
+            inputTokens: costData.inputTokens, outputTokens: costData.outputTokens,
+            cacheTokens: 0, costUsd: costData.costUsd, status: 'failed',
+          });
+        } catch (err) {
+          console.error('[ralph] Failed to record execution cost:', (err as Error).message);
+        }
 
         emit('ralph:error', { taskId: task.id, message: result.stderr || `Exit code ${result.exitCode}` });
 

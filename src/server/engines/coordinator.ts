@@ -17,6 +17,7 @@ import { emit } from '../lib/typedEmit';
 import * as workItemStore from '../services/workItemStore';
 import * as projectStore from '../services/projectStore';
 import { runHook } from '../services/pluginLoader';
+import { recordExecution } from '../services/costTracker';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -382,6 +383,25 @@ function handleStreamEvent(event: any): void {
         costUsd: event.total_cost_usd,
         usage: event.usage,
       });
+
+      // Record coordinator's own cost
+      if (event.total_cost_usd && _state.projectSlug) {
+        try {
+          recordExecution({
+            projectSlug: _state.projectSlug,
+            taskTitle: 'Coordinator (orchestration)',
+            model: 'sonnet',
+            duration: _state.stats.durationMs || 0,
+            inputTokens: event.usage?.input_tokens || 0,
+            outputTokens: event.usage?.output_tokens || 0,
+            cacheTokens: 0,
+            costUsd: event.total_cost_usd,
+            status: 'success',
+          });
+        } catch (err) {
+          console.error('[coordinator] Failed to record cost:', (err as Error).message);
+        }
+      }
 
       // Sync final stats from pool
       syncStatsFromPool();

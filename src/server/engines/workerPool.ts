@@ -167,9 +167,14 @@ export async function assignTask(opts: {
   // Run async — don't await (coordinator will poll via check_workers/wait_for_completion)
   (async () => {
     let output = '';
+    let costData = { costUsd: 0, inputTokens: 0, outputTokens: 0 };
+
     runner.on('output', (chunk: string) => {
       output += chunk;
       emit('live:output' as any, { workerId, taskId: opts.taskId, message: chunk });
+    });
+    runner.on('cost', (data: { costUsd: number; inputTokens: number; outputTokens: number }) => {
+      costData = data;
     });
     runner.on('escalation', (data: any) => {
       createEscalation({
@@ -212,10 +217,13 @@ export async function assignTask(opts: {
           projectSlug: _projectSlug!, workItemSlug: foundWiSlug,
           taskId: opts.taskId, taskTitle: foundTask.title,
           model: effectiveModel, duration: result.duration,
-          inputTokens: 0, outputTokens: 0, cacheTokens: 0,
+          inputTokens: costData.inputTokens, outputTokens: costData.outputTokens,
+          cacheTokens: 0, costUsd: costData.costUsd,
           status: result.exitCode === 0 ? 'success' : 'failed',
         });
-      } catch {}
+      } catch (err) {
+        console.error('[workerPool] Failed to record execution cost:', (err as Error).message);
+      }
 
       const wiAfter = workItemStore.getWorkItem(_projectSlug!, foundWiSlug);
       if (wiAfter) emit('workItem:updated' as any, { projectSlug: _projectSlug, workItem: wiAfter });
