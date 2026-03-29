@@ -23,12 +23,11 @@ jobs:
         id: version_check
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
-          if npm view kanbaii@$PKG_VERSION version 2>/dev/null; then
-            echo "⚠️ Version $PKG_VERSION already published — auto-bumping patch"
+          while npm view kanbaii@$PKG_VERSION version 2>/dev/null; do
+            echo "⚠️ Version $PKG_VERSION already published — bumping patch"
             npm version patch --no-git-tag-version
             PKG_VERSION=$(node -p "require('./package.json').version")
-            echo "✓ Bumped to $PKG_VERSION"
-          fi
+          done
           echo "version=$PKG_VERSION" >> $GITHUB_OUTPUT
           echo "✓ Will publish kanbaii@$PKG_VERSION"
         env:
