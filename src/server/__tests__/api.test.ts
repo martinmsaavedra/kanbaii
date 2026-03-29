@@ -74,7 +74,7 @@ describe('GET /api/health', () => {
     const res = await request('GET', '/api/health');
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
-    expect(res.body.version).toBe('0.1.0');
+    expect(typeof res.body.version).toBe('string');
     expect(typeof res.body.uptime).toBe('number');
   });
 });

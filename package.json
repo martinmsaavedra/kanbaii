@@ -1,6 +1,6 @@
 {
   "name": "kanbaii",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "AI-native kanban board for software development. Hierarchical project management with Claude AI integration.",
   "keywords": [
     "kanban",

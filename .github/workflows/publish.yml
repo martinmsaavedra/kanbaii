@@ -3,10 +3,6 @@ name: Publish to npm
 on:
   push:
     branches: [master]
-    paths-ignore:
-      - '*.md'
-      - 'docs/**'
-      - '.gitignore'
 
 jobs:
   publish:

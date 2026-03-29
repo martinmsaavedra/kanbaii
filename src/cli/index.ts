@@ -4,7 +4,7 @@
 
 import { Command } from 'commander';
 import { printBanner, getVersion } from './banner';
-import { runDiagnostics, findClaudePath } from './doctor';
+import { runDiagnostics, findClaudePath, isClaudeAuthenticated } from './doctor';
 import path from 'path';
 import fs from 'fs';
 
@@ -26,11 +26,26 @@ program
   .action(async (opts) => {
     printBanner();
 
-    // Quick pre-flight: check claude exists
+    // Pre-flight: check claude exists AND is authenticated
     const claudePath = findClaudePath();
     if (!claudePath) {
       console.log('  \x1b[31m✗\x1b[0m Claude CLI not found. Install it first:');
       console.log('    npm i -g @anthropic-ai/claude-code');
+      console.log('');
+      console.log('  Run \x1b[1mkanbaii doctor\x1b[0m for full diagnostics.');
+      process.exit(1);
+    }
+
+    // Check authentication
+    const authed = isClaudeAuthenticated(claudePath);
+    if (!authed) {
+      console.log('  \x1b[33m!\x1b[0m Claude CLI found but not authenticated.');
+      console.log('');
+      console.log('  Run this first to link your account:');
+      console.log('    \x1b[1mclaude\x1b[0m');
+      console.log('');
+      console.log('  This will open a browser to authenticate with Anthropic.');
+      console.log('  Once done, run \x1b[1mkanbaii start\x1b[0m again.');
       console.log('');
       console.log('  Run \x1b[1mkanbaii doctor\x1b[0m for full diagnostics.');
       process.exit(1);
@@ -50,7 +65,7 @@ program
 
     // Import and start server
     const { createApp } = require('../server/index');
-    const { httpServer, watcher } = createApp();
+    const { httpServer, io, watcher } = createApp();
 
     watcher.start();
 
@@ -76,11 +91,32 @@ program
       }
     });
 
-    // Graceful shutdown
+    // Graceful shutdown (mirrors src/server/index.ts logic)
+    let _shuttingDown = false;
     const shutdown = () => {
+      if (_shuttingDown) { process.exit(1); return; } // Second Ctrl+C = force kill
+      _shuttingDown = true;
       console.log('\n  Shutting down...');
+
+      // Stop background services first
+      try { require('../server/services/claudeUsage').stopPolling(); } catch {}
+      try { require('../server/services/schedulerService').stopSchedulerLoop(); } catch {}
+
+      // Stop active executions
+      try { require('../server/engines/coordinator').stopCoordinator(); } catch {}
+      try { require('../server/engines/workerPool').stopAllWorkers(); } catch {}
+      try { require('../server/engines/ralph').stopRalph(); } catch {}
+
       watcher.stop();
-      httpServer.close(() => process.exit(0));
+      io.close();
+
+      httpServer.close(() => {
+        console.log('  Server closed.');
+        process.exit(0);
+      });
+
+      // Force exit after 3 seconds
+      setTimeout(() => { console.log('  Force exit.'); process.exit(1); }, 3000).unref();
     };
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
@@ -111,6 +147,29 @@ program
     if (!fs.existsSync(gitignorePath)) {
       fs.writeFileSync(gitignorePath, 'data/\n.run-state.json\n.mcp-runtime*.json\n.coordinator-state.json\n', 'utf-8');
       console.log(`  \x1b[32m◇\x1b[0m Created .gitignore`);
+    }
+
+    // Validate Claude CLI setup
+    const claudePath = findClaudePath();
+    if (!claudePath) {
+      console.log(`  \x1b[31m✗\x1b[0m Claude CLI not found.`);
+      console.log('');
+      console.log('  KANBAII needs Claude Code to power AI features.');
+      console.log('  Install it:');
+      console.log('    \x1b[1mnpm i -g @anthropic-ai/claude-code\x1b[0m');
+      console.log('');
+      console.log('  Then authenticate:');
+      console.log('    \x1b[1mclaude\x1b[0m');
+      console.log('');
+    } else {
+      console.log(`  \x1b[32m◇\x1b[0m Claude CLI found: ${claudePath}`);
+      const authed = isClaudeAuthenticated(claudePath);
+      if (!authed) {
+        console.log(`  \x1b[33m!\x1b[0m Claude not authenticated. Run \x1b[1mclaude\x1b[0m to link your account.`);
+        console.log('');
+      } else {
+        console.log(`  \x1b[32m◇\x1b[0m Claude authenticated`);
+      }
     }
 
     console.log('');
