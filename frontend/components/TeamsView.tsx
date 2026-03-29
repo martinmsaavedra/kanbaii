@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Users, Play, Square, Zap, Plus, Trash2, X, Sparkles, Settings, Bot, Wrench, Radio, Brain, MessageSquare, ChevronRight, ChevronDown, Terminal } from 'lucide-react';
+import { Users, Play, Square, Zap, Plus, Trash2, X, Sparkles, Settings, Bot, Wrench, Radio, Brain, MessageSquare, ChevronRight, ChevronDown, Terminal, CheckCircle2 } from 'lucide-react';
 import { useWorkItemStore } from '@/stores/workItemStore';
 import { useAppStore } from '@/stores/appStore';
 import { useToastStore } from '@/stores/toastStore';
@@ -45,6 +45,15 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
   useEffect(() => {
     if (workerLogRef.current) workerLogRef.current.scrollTop = workerLogRef.current.scrollHeight;
   }, [expandedWorkerId, teams.workerLogs]);
+
+  // Toast notification when coordinator completes
+  const prevStatusRef = useRef(teams.coordinatorStatus);
+  useEffect(() => {
+    if (prevStatusRef.current !== 'completed' && teams.coordinatorStatus === 'completed' && teams.completionMessage) {
+      addToast(teams.completionMessage, 'success');
+    }
+    prevStatusRef.current = teams.coordinatorStatus;
+  }, [teams.coordinatorStatus, teams.completionMessage, addToast]);
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -91,9 +100,11 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
   const hasThinking = teams.coordinatorThinking.length > 0;
   const lastToolCalls = teams.coordinatorToolCalls.slice(-8);
 
+  const isCompleted = teams.coordinatorStatus === 'completed';
   const statusLabel = teams.coordinatorStatus === 'thinking' ? 'Thinking...'
     : teams.coordinatorStatus === 'calling-tool' ? 'Calling tool...'
     : teams.coordinatorStatus === 'waiting' ? 'Waiting...'
+    : isCompleted ? 'Completed'
     : teams.active ? 'Active' : 'Idle';
 
   return (
@@ -106,6 +117,7 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
           <Users size={18} />
           Teams
           {teams.active && <span className="w-[7px] h-[7px] rounded-full bg-success animate-breathe shadow-[0_0_8px_rgba(52,211,153,0.4)]" />}
+          {isCompleted && <span className="w-[7px] h-[7px] rounded-full bg-success shadow-[0_0_8px_rgba(52,211,153,0.4)]" />}
         </div>
         <div className="flex-1" />
 
@@ -219,20 +231,25 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
           {/* ─── Coordinator Brain (top — main focus) ─── */}
           <div className="flex-[3] min-h-0 flex flex-col p-4 overflow-hidden border-b border-border">
             <div className="flex items-center gap-2 mb-2">
-              <Brain size={14} className={teams.active ? 'text-accent animate-breathe' : 'text-text-muted'} />
+              <Brain size={14} className={teams.active ? 'text-accent animate-breathe' : isCompleted ? 'text-success' : 'text-text-muted'} />
               <span className="text-xs font-semibold text-text uppercase tracking-[0.08em] font-mono">Coordinator</span>
-              {teams.active && (
+              {(teams.active || isCompleted) && (
                 <span className={`flex items-center gap-1.5 text-xxs font-mono font-medium ml-2 px-2 py-0.5 rounded-full border
-                  ${teams.coordinatorStatus === 'thinking'
+                  ${isCompleted
+                    ? 'text-success bg-success-dim border-success/20'
+                    : teams.coordinatorStatus === 'thinking'
                     ? 'text-accent bg-accent-muted border-accent/20 animate-breathe'
                     : teams.coordinatorStatus === 'calling-tool'
                     ? 'text-warning bg-warning-dim border-warning/20'
                     : 'text-success bg-success-dim border-success/20 animate-breathe'
                   }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    teams.coordinatorStatus === 'thinking' ? 'bg-accent' :
-                    teams.coordinatorStatus === 'calling-tool' ? 'bg-warning' : 'bg-success'
-                  }`} />
+                  {isCompleted
+                    ? <CheckCircle2 size={10} className="text-success" />
+                    : <span className={`w-1.5 h-1.5 rounded-full ${
+                        teams.coordinatorStatus === 'thinking' ? 'bg-accent' :
+                        teams.coordinatorStatus === 'calling-tool' ? 'bg-warning' : 'bg-success'
+                      }`} />
+                  }
                   {statusLabel}
                 </span>
               )}
@@ -300,6 +317,14 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
                   )}
 
                   {teams.active && <span className="inline-block w-[6px] h-[14px] bg-accent animate-blink ml-0.5 mt-1" />}
+
+                  {/* Completion banner */}
+                  {isCompleted && teams.completionMessage && (
+                    <div className="mt-3 flex items-center gap-2 px-3 py-2.5 bg-success-dim border border-success/20 rounded-md animate-fade-in-up">
+                      <CheckCircle2 size={14} className="text-success shrink-0" />
+                      <span className="text-xs font-medium text-success font-mono">{teams.completionMessage}</span>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -308,7 +333,7 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
           {/* ─── Worker Pool (bottom — compact grid + expandable log drawer) ─── */}
           <div className={`${expandedWorkerId ? 'flex-[3]' : 'flex-[2]'} min-h-[120px] shrink-0 flex flex-col overflow-hidden p-4 transition-all duration-300 ease-out-expo`}>
             <div className="flex items-center gap-2 mb-2 shrink-0">
-              <Zap size={12} className={activeWorkers.length > 0 ? 'text-accent animate-breathe' : 'text-text-muted'} />
+              <Zap size={12} className={activeWorkers.length > 0 ? 'text-accent animate-breathe' : isCompleted ? 'text-success' : 'text-text-muted'} />
               <span className="text-xxs font-semibold text-text-muted uppercase tracking-[0.1em] font-mono">Workers</span>
               {activeWorkers.length > 0 && (
                 <span className="text-xxs text-success font-mono font-medium ml-auto">{activeWorkers.length} active</span>

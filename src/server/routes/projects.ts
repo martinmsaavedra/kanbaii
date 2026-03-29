@@ -51,12 +51,25 @@ router.patch('/:slug', (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/projects/:slug
-router.delete('/:slug', (req: Request, res: Response) => {
+// DELETE /api/projects/:slug — soft delete (move to trash)
+router.delete('/:slug/permanent', (req: Request, res: Response) => {
   try {
-    projectStore.deleteProject(req.params.slug);
+    projectStore.permanentDeleteProject(req.params.slug);
     emit('project:deleted', { slug: req.params.slug });
     res.json({ ok: true });
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('not found')) {
+      return res.status(404).json({ ok: false, error: err.message });
+    }
+    throw err;
+  }
+});
+
+router.delete('/:slug', (req: Request, res: Response) => {
+  try {
+    const project = projectStore.deleteProject(req.params.slug);
+    emit('project:updated', { project });
+    res.json({ ok: true, data: project });
   } catch (err) {
     if (err instanceof Error && err.message.includes('not found')) {
       return res.status(404).json({ ok: false, error: err.message });

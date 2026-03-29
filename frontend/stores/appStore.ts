@@ -83,7 +83,8 @@ export interface TeamsState {
   // Coordinator AI state
   coordinatorThinking: string[];
   coordinatorToolCalls: CoordinatorToolCall[];
-  coordinatorStatus: 'idle' | 'thinking' | 'calling-tool' | 'waiting';
+  coordinatorStatus: 'idle' | 'thinking' | 'calling-tool' | 'waiting' | 'completed';
+  completionMessage: string | null;
 }
 
 export interface PlannerTask {
@@ -131,7 +132,7 @@ const IDLE_RALPH: RalphRun = {
 
 const IDLE_TEAMS: TeamsState = {
   active: false, projectSlug: null, workers: [], metrics: null, logs: [], workerLogs: {}, inputNeeded: null,
-  coordinatorThinking: [], coordinatorToolCalls: [], coordinatorStatus: 'idle',
+  coordinatorThinking: [], coordinatorToolCalls: [], coordinatorStatus: 'idle', completionMessage: null,
 };
 
 const IDLE_PLANNER: PlannerState = {
@@ -299,7 +300,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     teams: {
       ...s.teams,
       active: false,
-      coordinatorStatus: 'idle',
+      coordinatorStatus: 'completed',
+      completionMessage: data.message,
       logs: [...s.teams.logs, `\n--- ${data.message} ---`],
     },
   })),
