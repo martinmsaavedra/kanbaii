@@ -75,13 +75,15 @@ function writeUsage(data: UsageData): void {
 
 // ─── CRUD ───
 
-export function recordExecution(data: Omit<ExecutionRecord, 'id' | 'timestamp' | 'costUsd'>): ExecutionRecord {
+export function recordExecution(data: Omit<ExecutionRecord, 'id' | 'timestamp' | 'costUsd'> & { costUsd?: number }): ExecutionRecord {
   const usage = readUsage();
   const record: ExecutionRecord = {
     ...data,
     id: `exec-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     timestamp: new Date().toISOString(),
-    costUsd: estimateCost(data.model, data.inputTokens, data.outputTokens, data.cacheTokens),
+    costUsd: data.costUsd && data.costUsd > 0
+      ? data.costUsd
+      : estimateCost(data.model, data.inputTokens, data.outputTokens, data.cacheTokens),
   };
   usage.executions.push(record);
   // Keep last 1000 records
