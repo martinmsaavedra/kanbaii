@@ -27,7 +27,9 @@ export const api = {
   updateProject: (slug: string, data: Record<string, unknown>) =>
     apiFetch<any>(`/api/projects/${slug}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteProject: (slug: string) =>
-    apiFetch<void>(`/api/projects/${slug}`, { method: 'DELETE' }),
+    apiFetch<any>(`/api/projects/${slug}`, { method: 'DELETE' }),
+  permanentDeleteProject: (slug: string) =>
+    apiFetch<void>(`/api/projects/${slug}/permanent`, { method: 'DELETE' }),
 
   // Work Items
   listWorkItems: (projectSlug: string) =>

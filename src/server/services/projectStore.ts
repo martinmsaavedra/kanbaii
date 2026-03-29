@@ -44,9 +44,7 @@ export function listProjects(): Project[] {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const p = readProject(entry.name);
-    if (p && p.status !== 'deleted') {
-      projects.push(p);
-    }
+    if (p) projects.push(p);
   }
   return projects.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
@@ -115,15 +113,23 @@ export function updateProject(slug: string, input: unknown): Project {
   return updated;
 }
 
-export function deleteProject(slug: string): void {
+export function deleteProject(slug: string): Project {
   const existing = readProject(slug);
   if (!existing) throw new Error(`Project not found: ${slug}`);
 
-  // Soft delete: mark as deleted
+  // Soft delete: mark as deleted (logical — never removes files)
   const updated: Project = {
     ...existing,
     status: 'deleted',
     updatedAt: new Date().toISOString(),
   };
   writeProject(updated);
+  return updated;
+}
+
+export function permanentDeleteProject(slug: string): void {
+  // Logical permanent delete — removes project.json dir only, never touches workingDir
+  const dir = projectDir(slug);
+  if (!fs.existsSync(dir)) throw new Error(`Project not found: ${slug}`);
+  fs.rmSync(dir, { recursive: true, force: true });
 }

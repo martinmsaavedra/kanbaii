@@ -25,6 +25,7 @@ interface ProjectStore {
   createProject: (data: { title: string; description?: string; color?: string; workingDir?: string }) => Promise<Project>;
   updateProject: (slug: string, data: Record<string, unknown>) => Promise<void>;
   deleteProject: (slug: string) => Promise<void>;
+  permanentDeleteProject: (slug: string) => Promise<void>;
 
   // Socket handlers
   onProjectUpdated: (project: Project) => void;
@@ -69,7 +70,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   deleteProject: async (slug) => {
-    await api.deleteProject(slug);
+    const updated = await api.deleteProject(slug);
+    set((s) => ({
+      projects: s.projects.map((p) => (p.slug === slug ? updated : p)),
+      activeSlug: s.activeSlug === slug ? null : s.activeSlug,
+    }));
+  },
+
+  permanentDeleteProject: async (slug) => {
+    await api.permanentDeleteProject(slug);
     set((s) => ({
       projects: s.projects.filter((p) => p.slug !== slug),
       activeSlug: s.activeSlug === slug ? null : s.activeSlug,
