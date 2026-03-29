@@ -35,6 +35,8 @@ jobs:
 
       - run: npm ci
       - run: npx tsc -p tsconfig.build.json
+      - name: Copy MCP server (plain JS not compiled by tsc)
+        run: mkdir -p dist/server/mcp && cp src/server/mcp/*.js dist/server/mcp/
       - run: cd frontend && npm ci && npm run build
       - run: rm -rf dashboard && cp -r frontend/out dashboard
 
