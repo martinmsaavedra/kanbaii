@@ -1,10 +1,11 @@
 {
   "name": "kanbaii",
-  "version": "0.3.0",
-  "description": "AI-native kanban board for software development. Hierarchical project management with Claude AI integration.",
+  "version": "0.3.1",
+  "description": "The organization layer that Claude Code doesn't have. Plan visually, track progress, let AI execute.",
   "keywords": [
     "kanban",
     "claude",
+    "claude-code",
     "ai",
     "task-management",
     "project-management",
@@ -12,7 +13,9 @@
     "dashboard",
     "automation",
     "agent",
-    "anthropic"
+    "anthropic",
+    "developer-tools",
+    "devtools"
   ],
   "license": "MIT",
   "author": "Martin Saavedra",
