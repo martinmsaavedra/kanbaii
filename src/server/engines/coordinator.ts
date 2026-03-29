@@ -16,6 +16,7 @@ import { generateMcpConfigForClaude } from '../services/mcpConfig';
 import { emit } from '../lib/typedEmit';
 import * as workItemStore from '../services/workItemStore';
 import * as projectStore from '../services/projectStore';
+import { runHook } from '../services/pluginLoader';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -173,7 +174,10 @@ export async function startCoordinator(config: CoordinatorConfig): Promise<void>
     }
   }
 
-  // ── 8. Emit started events ──────────────────────────────────────────
+  // ── 8. Plugin: preRun hook ───────────────────────────────────────────
+  await runHook('preRun', { runType: 'teams', projectSlug });
+
+  // ── 9. Emit started events ──────────────────────────────────────────
   emit('live:started' as any, { projectSlug, workItemSlugs, maxWorkers });
   emit('coordinator:started' as any, {
     projectSlug,
@@ -230,7 +234,7 @@ export async function startCoordinator(config: CoordinatorConfig): Promise<void>
     });
 
     // ── On close: cleanup ───────────────────────────────────────────
-    proc.on('close', (code: number | null) => {
+    proc.on('close', async (code: number | null) => {
       // Flush remaining buffer
       if (lineBuf.trim()) {
         try {
@@ -258,6 +262,9 @@ export async function startCoordinator(config: CoordinatorConfig): Promise<void>
       } else {
         _state.status = 'idle';
       }
+
+      // Plugin: postRun hook
+      await runHook('postRun', { runType: 'teams', stats: { ..._state.stats } });
 
       // Clean up worker pool
       resetPool();

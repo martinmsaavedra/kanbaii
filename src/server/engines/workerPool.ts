@@ -8,6 +8,8 @@ import * as projectStore from '../services/projectStore';
 import { getDocument } from '../services/soulStore';
 import { createEscalation } from '../services/escalationService';
 import { recordExecution } from '../services/costTracker';
+import { buildSkillsPrompt } from '../services/skillsRegistry';
+import { runHook } from '../services/pluginLoader';
 
 export interface WorkerInfo {
   id: string;
@@ -159,6 +161,9 @@ export async function assignTask(opts: {
     agentName: agent.name, workItemSlug: foundWiSlug,
   });
 
+  // Build skills prompt for worker (same as Ralph does)
+  const skillsPrompt = buildSkillsPrompt();
+
   // Run async — don't await (coordinator will poll via check_workers/wait_for_completion)
   (async () => {
     let output = '';
@@ -173,15 +178,22 @@ export async function assignTask(opts: {
       });
     });
 
+    // Plugin: preTask hook
+    await runHook('preTask', { taskId: opts.taskId, title: foundTask.title, workingDir: project.workingDir! });
+
     try {
       const result = await runner.run({
         prompt, workingDir: project.workingDir!, model: effectiveModel, maxTurns: 50,
+        systemPrompt: skillsPrompt || undefined,
       });
 
       workerInfo.status = result.exitCode === 0 ? 'completed' : 'failed';
       workerInfo.exitCode = result.exitCode;
       workerInfo.completedAt = new Date().toISOString();
       workerInfo.output = output || result.stdout;
+
+      // Plugin: postTask hook
+      await runHook('postTask', { taskId: opts.taskId, title: foundTask.title, exitCode: result.exitCode, output });
 
       // Move task based on result
       if (result.exitCode === 0) {
