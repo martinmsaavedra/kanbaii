@@ -19,43 +19,28 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      # Check if this version is already published — skip if so
-      - name: Check if version exists
+      - name: Ensure unpublished version
         id: version_check
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
-          echo "version=$PKG_VERSION" >> $GITHUB_OUTPUT
           if npm view kanbaii@$PKG_VERSION version 2>/dev/null; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "⚠️ Version $PKG_VERSION already published — skipping"
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "✓ Version $PKG_VERSION is new — will publish"
+            echo "⚠️ Version $PKG_VERSION already published — auto-bumping patch"
+            npm version patch --no-git-tag-version
+            PKG_VERSION=$(node -p "require('./package.json').version")
+            echo "✓ Bumped to $PKG_VERSION"
           fi
+          echo "version=$PKG_VERSION" >> $GITHUB_OUTPUT
+          echo "✓ Will publish kanbaii@$PKG_VERSION"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      # Install server dependencies
-      - if: steps.version_check.outputs.exists == 'false'
-        run: npm ci
+      - run: npm ci
+      - run: npx tsc -p tsconfig.build.json
+      - run: cd frontend && npm ci && npm run build
+      - run: rm -rf dashboard && cp -r frontend/out dashboard
 
-      # Build server + CLI (production, no source maps)
-      - if: steps.version_check.outputs.exists == 'false'
-        run: npx tsc -p tsconfig.build.json
-
-      # Install frontend dependencies + build
-      - if: steps.version_check.outputs.exists == 'false'
-        run: cd frontend && npm ci && npm run build
-
-      # Copy frontend build to dashboard/
-      - if: steps.version_check.outputs.exists == 'false'
-        run: rm -rf dashboard && cp -r frontend/out dashboard
-
-      # Publish to npm
-      - if: steps.version_check.outputs.exists == 'false'
-        run: npm publish --access public --provenance
+      - run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - if: steps.version_check.outputs.exists == 'false'
-        run: echo "✅ Published kanbaii@${{ steps.version_check.outputs.version }}"
+      - run: echo "✅ Published kanbaii@${{ steps.version_check.outputs.version }}"
