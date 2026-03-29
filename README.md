@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/kanbaii-v0.2.0-6366f1?style=for-the-badge&labelColor=0a0a0b" alt="Version" />
+  <img src="https://img.shields.io/npm/v/kanbaii?style=for-the-badge&color=6366f1&labelColor=0a0a0b" alt="npm version" />
+  <img src="https://img.shields.io/npm/dw/kanbaii?style=for-the-badge&color=22c55e&labelColor=0a0a0b" alt="downloads" />
   <img src="https://img.shields.io/badge/node-%3E%3D18-22c55e?style=for-the-badge&labelColor=0a0a0b" alt="Node" />
   <img src="https://img.shields.io/badge/license-MIT-71717a?style=for-the-badge&labelColor=0a0a0b" alt="License" />
-  <img src="https://img.shields.io/badge/AI-Claude-f59e0b?style=for-the-badge&labelColor=0a0a0b" alt="Claude AI" />
 </p>
 
 <h1 align="center">
@@ -12,214 +12,170 @@
 </h1>
 
 <p align="center">
-  <strong>Your ideas deserve structure. AI gives them momentum.</strong>
+  <strong>The organization layer that Claude Code doesn't have.</strong>
   <br />
-  <sub>For creators, founders, students, teams, and anyone with a plan to execute.</sub>
+  <sub>Plan visually. Track progress. Let AI execute. All local, all yours.</sub>
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick Start</a> ·
-  <a href="#who-is-it-for">Who Is It For</a> ·
-  <a href="#concepts">Concepts</a> ·
-  <a href="#wizard">Wizard</a> ·
-  <a href="#ralph--teams">Ralph & Teams</a> ·
-  <a href="#cli">CLI</a>
+  <a href="#the-problem">The Problem</a> ·
+  <a href="#30-second-start">30-Second Start</a> ·
+  <a href="#how-it-works">How It Works</a> ·
+  <a href="#when-to-use-what">When To Use What</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#cli-reference">CLI</a>
 </p>
 
 ---
 
-## What Is KANBAII
+## The Problem
 
-A local-first project board powered by AI. No accounts, no subscriptions, no cloud. Install it, open it, organize anything — from a product launch to a thesis, from a startup MVP to a home renovation plan.
+**Claude Code is incredible at executing.** You give it a task, it does it. But when your project has 15 features, 8 bugs, and 3 refactors — all at different stages — Claude Code doesn't know where you left off, what's next, or what the big picture looks like.
 
-KANBAII gives you structure when you need it and an AI that can actually execute work for you.
+You need a board. You need structure. You need to see the whole battlefield.
 
-```bash
-npx kanbaii
-```
+**That's KANBAII.** A visual kanban board that sits on top of Claude Code. Organize your work, track progress across work items, and when you're ready — hit play and let AI execute the tasks for you.
 
-That's it. Opens in your browser.
+> KANBAII doesn't replace Claude Code. It gives Claude Code a mission control.
 
 ---
 
-## Who Is It For
+## 30-Second Start
 
-**Everyone.** You don't need to be a programmer.
-
-| You are... | KANBAII helps you... |
-|---|---|
-| A **founder** with 10 ideas and no process | Break each idea into clear steps and prioritize |
-| A **student** planning a thesis or project | Turn a vague goal into a structured plan with tasks |
-| A **freelancer** juggling clients | Separate projects, track what's active, what's done |
-| A **developer** building software | Execute tasks with AI agents that write code for you |
-| A **team lead** coordinating work | Run multiple work streams in parallel with Teams |
-| A **creator** launching something | Plan, track, and ship — without spreadsheet chaos |
-
-If you've ever felt overwhelmed by everything you need to do, KANBAII turns that noise into a clear board.
-
----
-
-## Quick Start
-
-### 1. Prerequisites
-
-You need [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated:
+**Prerequisites:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated.
 
 ```bash
-npm install -g @anthropic-ai/claude-code
-claude login
-```
-
-### 2. Install & Run
-
-```bash
+# Install
 npm install -g kanbaii
-kanbaii doctor          # verify everything works
-kanbaii start           # opens browser at localhost:5555
+
+# Verify everything works
+kanbaii doctor
+
+# Launch — opens in your browser
+kanbaii start
 ```
 
-Or without installing: `npx kanbaii start`
-
-### 3. Create Your First Project
-
-1. Click **+ New** in the sidebar
-2. Name your project (e.g., "My App")
-3. Set the **working directory** — the folder where your code lives
-
-### 4. Plan with AI
-
-1. Go to the **Planner** tab
-2. Describe what you want to build in plain language
-3. AI generates work items with plans and tasks
-4. Review, edit, approve — your board is populated
-
-### 5. Execute
-
-**Manual**: Drag tasks across columns as you work.
-
-**Ralph** (single work item): Click a work item → Ralph tab → Play. Claude executes tasks sequentially, asks you questions when blocked.
-
-**Teams** (multiple work items): Go to Teams tab → select work items → Start. The AI coordinator assigns tasks to workers in parallel.
-
-### 6. That's It
-
-Your data lives in `./data/projects/` as clean JSON files. No cloud, no accounts. Stop the server with Ctrl+C.
+That's it. Your board is at `localhost:5555`. Data stays on your machine as clean JSON files.
 
 ---
 
-## Concepts
+## How It Works
 
-### The Hierarchy
-
-KANBAII organizes work in two levels:
+### 1. Organize in two levels
 
 ```
 Project (your big goal)
-  └── Work Items (the pieces to build)
+  └── Work Items (Feature / Bug / Refactor)
         ├── Plan (context, strategy, notes)
-        └── Tasks (concrete steps on a kanban board)
+        └── Tasks (5-column kanban board)
 ```
 
-**Work Items** are the meaningful chunks: a feature to build, a bug to fix, a section to refactor. Each one gets its own 5-column kanban board.
+**Work Items** are the meaningful chunks. Each one gets its own kanban board with `Backlog → Todo → In Progress → Review → Done`.
 
-### Work Item Types
+### 2. Plan with AI (or manually)
 
-| Type | When to use | Color |
-|------|------------|-------|
-| **Feature** | Something new to create | Indigo |
-| **Bug** | Something broken to fix | Red |
-| **Refactor** | Something existing to improve | Amber |
+Open the **Planner** — describe what you want in plain language:
 
-### Two Levels of Kanban
+> "I need user auth with login, signup, password reset, and OAuth for Google & GitHub"
 
-- **Level 1 — Work Items Board**: Drag work items across `Planning → Active → Review → Done`
-- **Level 2 — Task Board**: Each work item has its own `Backlog → Todo → In Progress → Review → Done`
+AI generates structured work items with plans and tasks. Review, edit, approve. Or skip the AI and create everything manually — your call.
 
-Click a work item to enter its board. Breadcrumb to navigate back. Simple.
+### 3. Execute
 
----
+Three modes, pick what fits:
 
-## Wizard
+| Mode | What it does | When to use |
+|------|-------------|-------------|
+| **Manual** | You drag tasks across columns | When you're doing the work yourself |
+| **Ralph** | AI executes one work item end-to-end | Focused, sequential work |
+| **Teams** | AI coordinator runs multiple work items in parallel | Sprint-style, multiple fronts at once |
 
-The AI wizard turns a sentence into a structured plan:
-
-1. Pick a type (Feature / Bug / Refactor)
-2. Describe what you need in plain language
-3. AI generates a plan — you review and approve
-4. AI generates tasks from the plan — you review and approve
-5. Your board is populated and ready
-
-Skip any step. Edit anything. The wizard accelerates — it never locks you in.
+Ralph reads the plan, resolves dependencies, executes tasks in order, and moves them to Review. Teams does the same — but with multiple workers, simultaneously.
 
 ---
 
-## Ralph & Teams
+## When To Use What
 
-### Ralph — Single Executor
+This is the key question. Here's the honest answer:
 
-Select one work item. Ralph handles it end to end:
+```
+                         ┌─────────────────────────────┐
+  "Fix this one bug"     │                             │
+  "Refactor this func"   │     Claude Code directly     │
+  "Explain this code"    │     (terminal, one task)     │
+  "Write tests for X"    │                             │
+                         └─────────────────────────────┘
 
-- Reads the plan for context
-- Resolves task dependencies
-- Executes tasks in order (parallel where safe)
-- Moves completed work to Review
-- Reports back with summaries
+                         ┌─────────────────────────────┐
+  "Build auth system"    │                             │
+  "8 bugs to triage"     │         KANBAII              │
+  "MVP with 15 features" │   (board + AI execution)    │
+  "Track sprint progress" │                             │
+                         └─────────────────────────────┘
+```
 
-**Think of Ralph as a focused assistant** — one work item, full attention.
+**The rule:** if you can describe it in one sentence → Claude Code. If you need a list → KANBAII.
+
+They're not competing tools. KANBAII calls Claude Code under the hood. It's the **project layer** that makes Claude Code work across many tasks instead of one at a time.
+
+---
+
+## Features
+
+### Visual Kanban Board
+Two-level board with drag & drop. Work items flow through `Planning → Active → Review → Done`. Tasks inside each work item flow through 5 columns. Real-time updates via Socket.IO.
+
+### AI Planner
+Describe what you need in natural language. AI generates work items with full plans and decomposed tasks. Review and approve before anything hits your board.
+
+### Ralph — Focused Executor
+One work item, full attention. Reads the plan, picks up tasks from Todo, executes them sequentially (parallel where safe), moves completed work to Review. Pauses and asks you when it needs input.
 
 ### Teams — Parallel Execution
+Select multiple work items. A coordinator assigns each to a worker. Workers execute simultaneously — one work item per worker. Watch progress from the Teams dashboard.
 
-Select multiple work items. A coordinator assigns each to a worker. Workers execute simultaneously — one work item per worker.
+### Local-First, Zero Config
+No accounts. No subscriptions. No cloud. Your data is JSON files on disk. Fully git-friendly. Stop the server and your data is still there, readable, portable.
 
-**Think of Teams as a squad** — multiple work items, all moving at once.
-
----
-
-## CLI
-
-```bash
-kanbaii start          # Start the server (opens browser)
-kanbaii start -p 8080  # Custom port
-kanbaii start --no-open # Don't open browser
-kanbaii doctor         # Check Claude CLI, Node, auth, dependencies
-kanbaii status         # Health check (is server running?)
-kanbaii init           # Initialize data directory
-kanbaii stop           # Info for stopping the server
-```
-
-### Configuration
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `port` | `5555` | Server port |
-| `dataDir` | `~/.kanbaii/data` | Where project data lives |
-| `openBrowser` | `true` | Auto-open on start |
-
-```bash
-kanbaii init --port 8080 --data ~/my-projects
-```
+### Developer Experience
+- **Command Palette** (`Ctrl+K`) for fast navigation
+- **Keyboard-first** — everything accessible without a mouse
+- **Dark & Light themes** — Obsidian dark mode, Porcelain light mode
+- **Doctor command** — validates Claude CLI, auth, Node.js, everything
 
 ---
 
-## How Data Works
+## Data Structure
 
-No database. Clean JSON files on disk, fully git-friendly:
+No database. Clean JSON files you can read, edit, and version control:
 
 ```
-data/projects/my-project/
-  project.json
+data/projects/my-app/
+  project.json                    # Project metadata
   work-items/
-    feat-auth-system.json
-    bug-login-crash.json
+    feat-auth-system.json         # Feature with plan + tasks
+    bug-login-crash.json          # Bug with plan + tasks
 ```
 
-Your data stays on your machine. Always.
+---
+
+## CLI Reference
+
+```bash
+kanbaii start              # Start server, open browser
+kanbaii start -p 8080      # Custom port
+kanbaii start --no-open    # Don't open browser
+kanbaii start --data-dir ~/my-data  # Custom data directory
+kanbaii doctor             # Diagnose: Claude CLI, Node, auth
+kanbaii status             # Is the server running?
+kanbaii init               # Initialize data directory
+```
 
 ---
 
 ## Architecture
 
-For contributors and the curious:
+For contributors:
 
 ```
 Express + Socket.IO ──── Single port (default: 5555)
@@ -229,56 +185,38 @@ Express + Socket.IO ──── Single port (default: 5555)
        └── /*               Static frontend (Next.js export)
 ```
 
-| Component | Technology |
-|-----------|-----------|
-| Backend | Express 4 + Socket.IO 4 |
-| Frontend | Next.js 14 (static export) |
-| State | Zustand |
-| Drag & Drop | @atlaskit/pragmatic-drag-and-drop |
-| Animations | Framer Motion |
-| AI Engine | Claude CLI |
-| CLI | Commander.js |
-| Validation | Zod |
+| Layer | Stack |
+|-------|-------|
+| Backend | Express, Socket.IO, Zod |
+| Frontend | Next.js 14, Zustand, Framer Motion |
+| AI | Claude Code CLI |
 | Testing | Vitest |
-
----
-
-## Development
 
 ```bash
 git clone https://github.com/martinmsaavedra/kanbaii.git
-cd kanbaii
-
-npm install
+cd kanbaii && npm install
 cd frontend && npm install && cd ..
 
-# Dev mode
 npm run dev:server    # Express on :5555
 npm run dev:frontend  # Next.js on :3000
-
-# Test
 npm test
-
-# Build
-npm run build
 ```
 
 ---
 
 ## Philosophy
 
-> Structure without ceremony. AI without lock-in. Your data, your machine.
+> **Structure without ceremony. AI without lock-in. Your data, your machine.**
 
-KANBAII is for anyone who wants to:
-- Turn ideas into action without overthinking the process
-- Stay organized without paying for another SaaS
-- Let AI do the heavy lifting while you stay in control
-- Work locally, own your data, move fast
+- Your board is a JSON folder, not a vendor database
+- Claude Code does the real work — KANBAII just gives it structure
+- No accounts, no cloud, no tracking — install and go
+- Organization is the multiplier — not more AI, but better-directed AI
 
 ---
 
 <p align="center">
-  <sub>Built by <a href="https://github.com/martinmsaavedra">Martín Saavedra</a></sub>
+  <sub>Built by <a href="https://github.com/martinmsaavedra">Martin Saavedra</a></sub>
   <br />
-  <sub>Powered by <a href="https://anthropic.com">Claude</a> · Licensed under MIT</sub>
+  <sub>Powered by <a href="https://anthropic.com">Claude</a> · MIT License</sub>
 </p>

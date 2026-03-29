@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { ChevronDown, Sparkles, Layers, LayoutGrid, Bot, Users, Zap, ArrowDown } from 'lucide-react';
+import { ChevronDown, Sparkles, Layers, LayoutGrid, Bot, Users, Zap, ArrowDown, Terminal, ArrowRight } from 'lucide-react';
 
 /* ═══════════════════════════════════════════
    Expandable Section
@@ -91,6 +91,66 @@ function MiniColumn({ title, children, highlight }: { title: string; children?: 
 }
 
 /* ═══════════════════════════════════════════
+   Section: The Point
+   ═══════════════════════════════════════════ */
+
+function WhenToUseWhat() {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
+        {/* Claude Code */}
+        <div className="rounded-md border border-border/40 bg-bg/50 p-3">
+          <div className="flex items-center gap-2 mb-2.5">
+            <Terminal size={12} className="text-text-muted/50" />
+            <span className="text-[11px] font-mono font-medium text-text-secondary">Claude Code</span>
+          </div>
+          <div className="flex flex-col gap-1 text-[11px] text-text-muted leading-relaxed">
+            <span>&ldquo;Fix this bug&rdquo;</span>
+            <span>&ldquo;Refactor this function&rdquo;</span>
+            <span>&ldquo;Explain this code&rdquo;</span>
+            <span>&ldquo;Write tests for X&rdquo;</span>
+          </div>
+          <div className="mt-2.5 pt-2 border-t border-border/30 text-[10px] font-mono text-text-muted/40">
+            One task, one session
+          </div>
+        </div>
+
+        {/* KANBAII */}
+        <div className="rounded-md border border-accent/30 bg-accent/[0.03] p-3">
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="text-accent text-[13px]">&#x25C7;</span>
+            <span className="text-[11px] font-mono font-medium text-accent">KANBAII</span>
+          </div>
+          <div className="flex flex-col gap-1 text-[11px] text-text-secondary leading-relaxed">
+            <span>&ldquo;Build the auth system&rdquo;</span>
+            <span>&ldquo;8 bugs to triage this week&rdquo;</span>
+            <span>&ldquo;MVP with 15 features&rdquo;</span>
+            <span>&ldquo;Track sprint progress&rdquo;</span>
+          </div>
+          <div className="mt-2.5 pt-2 border-t border-accent/20 text-[10px] font-mono text-accent/40">
+            Many tasks, full visibility
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-center gap-2 py-1">
+        <div className="h-px flex-1 bg-border/30" />
+        <span className="text-[10px] font-mono text-text-muted/40 px-2">They work together</span>
+        <div className="h-px flex-1 bg-border/30" />
+      </div>
+
+      <div className="flex items-center justify-center gap-3 text-[11px] text-text-muted font-mono">
+        <span className="text-text-secondary">You organize in KANBAII</span>
+        <ArrowRight size={10} className="text-accent/40" />
+        <span className="text-text-secondary">KANBAII sends tasks to Claude Code</span>
+        <ArrowRight size={10} className="text-accent/40" />
+        <span className="text-text-secondary">Results come back to the board</span>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
    Section: Hierarchy
    ═══════════════════════════════════════════ */
 
@@ -127,7 +187,7 @@ function HierarchyExample() {
         </div>
       </div>
       <p className="text-xs text-text-muted leading-relaxed text-center">
-        Each work item has its own plan, tasks, and board.
+        Each work item has its own plan, tasks, and kanban board.
       </p>
     </div>
   );
@@ -362,18 +422,28 @@ export function WelcomeLanding() {
             <span className="text-[44px] leading-none text-accent opacity-20 animate-breathe select-none">&#x25C7;</span>
             <div className="absolute inset-0 blur-[24px] bg-accent/10 rounded-full" />
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             <h1 className="text-[26px] font-semibold text-text tracking-tight">
-              Welcome to KANBAII
+              The organization layer for Claude Code
             </h1>
-            <p className="text-sm text-text-secondary leading-relaxed">
-              Structure for your ideas. AI to move them forward.
-              <span className="text-text-muted"> — For everyone: builders, students, founders, creators.</span>
+            <p className="text-sm text-text-secondary leading-relaxed max-w-lg">
+              Claude Code is great at executing one task. KANBAII lets you see the whole project, plan the work, and let AI execute across many tasks at once.
             </p>
           </div>
         </div>
 
-        {/* ─── Top row: Hierarchy + Kanban side by side ─── */}
+        {/* ─── When to use what ─── */}
+        <Section
+          icon={<Zap size={14} />}
+          title="KANBAII + Claude Code"
+          subtitle="Not a replacement — the project layer Claude Code doesn't have"
+          accentColor="bg-accent/8 text-accent/60"
+          defaultOpen
+        >
+          <WhenToUseWhat />
+        </Section>
+
+        {/* ─── Hierarchy + Kanban side by side ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 items-stretch">
           <Section
             icon={<Layers size={14} />}
@@ -399,8 +469,8 @@ export function WelcomeLanding() {
         {/* ─── Wizard full width ─── */}
         <Section
           icon={<Sparkles size={14} />}
-          title="AI Wizard"
-          subtitle="Describe what you need → get a plan and tasks instantly"
+          title="AI Planner"
+          subtitle="Describe what you need → get a structured plan and tasks"
           accentColor="bg-warning/10 text-warning/70"
         >
           <WizardExample />
@@ -411,7 +481,7 @@ export function WelcomeLanding() {
           <Section
             icon={<Bot size={14} />}
             title="Ralph — focused executor"
-            subtitle="One work item, executed end to end"
+            subtitle="One work item, executed end to end by AI"
             accentColor="bg-accent/8 text-accent/60"
           >
             <RalphExample />
@@ -420,17 +490,41 @@ export function WelcomeLanding() {
           <Section
             icon={<Users size={14} />}
             title="Teams — parallel execution"
-            subtitle="Multiple items, multiple workers, at once"
+            subtitle="Multiple items, multiple AI workers, at once"
             accentColor="bg-success/10 text-success/70"
           >
             <TeamsExample />
           </Section>
         </div>
 
+        {/* ─── Quick Start ─── */}
+        <div className="rounded-lg border border-border/40 bg-surface/30 p-5">
+          <div className="flex items-center gap-2.5 mb-3">
+            <Terminal size={14} className="text-accent/50" />
+            <span className="text-sm font-medium text-text">Quick Start</span>
+          </div>
+          <div className="font-mono text-[12px] text-text-muted leading-relaxed flex flex-col gap-1">
+            <div className="flex gap-3">
+              <span className="text-text-muted/30 select-none">$</span>
+              <span><span className="text-accent/70">npm</span> install -g kanbaii</span>
+            </div>
+            <div className="flex gap-3">
+              <span className="text-text-muted/30 select-none">$</span>
+              <span><span className="text-accent/70">kanbaii</span> doctor</span>
+              <span className="text-text-muted/30 ml-4"># verify Claude CLI + auth</span>
+            </div>
+            <div className="flex gap-3">
+              <span className="text-text-muted/30 select-none">$</span>
+              <span><span className="text-accent/70">kanbaii</span> start</span>
+              <span className="text-text-muted/30 ml-4"># opens this dashboard</span>
+            </div>
+          </div>
+        </div>
+
         {/* ─── CTA ─── */}
         <div className="flex items-center justify-center gap-2 text-xs text-text-muted font-mono pb-4">
           <Zap size={10} className="text-accent/30" />
-          Create or select a project from the sidebar to begin
+          Create a project from the sidebar to begin
         </div>
       </div>
     </div>
