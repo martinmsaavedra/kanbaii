@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useProjectStore } from '@/stores/projectStore';
 import { useModalOverlay } from '@/hooks/useModalOverlay';
 import { useRouterStore } from '@/stores/routerStore';
+import { api } from '@/lib/api';
 
 const COLORS = ['#6366f1', '#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6'];
 
@@ -21,6 +22,13 @@ export function CreateProjectModal({ onClose }: Props) {
   const [color, setColor] = useState(COLORS[0]);
   const [loading, setLoading] = useState(false);
   const { overlayProps } = useModalOverlay(onClose, { disabled: loading });
+
+  // Pre-fill workingDir with server's cwd
+  useEffect(() => {
+    api.getHealth().then((h) => {
+      if (h.cwd && !workingDir) setWorkingDir(h.cwd);
+    }).catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,6 +85,7 @@ export function CreateProjectModal({ onClose }: Props) {
               onChange={(e) => setWorkingDir(e.target.value)}
               placeholder="C:\Users\...\my-project"
             />
+            <span className="text-[10px] text-text-muted mt-1 opacity-60">Where Claude runs commands. Defaults to where kanbaii was started.</span>
           </div>
 
           <div className="flex flex-col">

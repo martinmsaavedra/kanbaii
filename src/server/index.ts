@@ -86,6 +86,7 @@ export function createApp() {
       },
       node: process.version,
       platform: process.platform,
+      cwd: process.cwd(),
     });
   });
 

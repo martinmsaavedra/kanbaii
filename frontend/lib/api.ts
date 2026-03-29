@@ -13,6 +13,12 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
 }
 
 export const api = {
+  // Health (returns root-level fields, not wrapped in .data)
+  getHealth: async (): Promise<{ cwd: string; version: string }> => {
+    const res = await fetch(`${API_BASE}/api/health`);
+    return res.json();
+  },
+
   // Projects
   listProjects: () => apiFetch<any[]>('/api/projects'),
   getProject: (slug: string) => apiFetch<any>(`/api/projects/${slug}`),

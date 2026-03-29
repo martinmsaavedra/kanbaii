@@ -74,7 +74,7 @@ export function createProject(input: unknown): Project {
     title: dto.title,
     description: dto.description,
     color: dto.color ?? '#6366f1',
-    workingDir: dto.workingDir,
+    workingDir: dto.workingDir || process.cwd(),
     status: 'active',
     createdAt: now,
     updatedAt: now,
