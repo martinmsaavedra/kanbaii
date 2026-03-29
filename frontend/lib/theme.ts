@@ -68,12 +68,12 @@ export const agentColors: Record<string, { bg: string; text: string; border: str
     text: '#3b82f6',
     border: 'rgba(59, 130, 246, 0.25)',
   },
-  TestAgent: {
+  TesterAgent: {
     bg: 'rgba(34, 197, 94, 0.12)',
     text: '#22c55e',
     border: 'rgba(34, 197, 94, 0.25)',
   },
-  ReviewAgent: {
+  ReviewerAgent: {
     bg: 'rgba(168, 85, 247, 0.12)',
     text: '#a855f7',
     border: 'rgba(168, 85, 247, 0.25)',

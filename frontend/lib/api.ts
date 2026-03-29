@@ -50,4 +50,11 @@ export const api = {
     apiFetch<any>(`/api/projects/${projectSlug}/work-items/${wiId}/tasks/${taskId}/move`, { method: 'POST', body: JSON.stringify(data) }),
   deleteTask: (projectSlug: string, wiId: string, taskId: string) =>
     apiFetch<void>(`/api/projects/${projectSlug}/work-items/${wiId}/tasks/${taskId}`, { method: 'DELETE' }),
+
+  // Agents
+  getAgents: () => apiFetch<any[]>('/api/agents'),
+  suggestAgent: (tags: string[]) =>
+    apiFetch<{ agent: string | null; reason: string; confidence: 'high' | 'low' }>(
+      `/api/agents/suggest?tags=${tags.map(encodeURIComponent).join(',')}`
+    ),
 };

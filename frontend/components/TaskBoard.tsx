@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useCallback, useRef, useState } from 'react';
-import { Home, ChevronRight, ChevronDown, Plus, Pencil, Search, Play, Square } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Home, ChevronRight, ChevronDown, Plus, Pencil, Search, Play, Square, Zap } from 'lucide-react';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import { useWorkItemStore, WorkItem } from '@/stores/workItemStore';
@@ -9,6 +10,7 @@ import { useRouterStore } from '@/stores/routerStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useToastStore } from '@/stores/toastStore';
 import { api } from '@/lib/api';
+import { agentColors } from '@/lib/theme';
 import { TaskModal } from './TaskModal';
 import { FilterBar, FilterState, EMPTY_FILTER, isFiltered, matchesFilter } from './FilterBar';
 import { useAppStore } from '@/stores/appStore';
@@ -33,9 +35,95 @@ const PRIORITY_COLORS: Record<string, string> = {
   urgent: '#f43f5e', high: '#f59e0b', medium: '#6366f1', low: '#71717a',
 };
 
+const DEFAULT_AGENT_COLOR = { bg: 'rgba(148, 163, 242, 0.1)', text: '#94a3f2', border: 'rgba(148, 163, 242, 0.2)' };
+
+function getAgentColor(name: string) {
+  return agentColors[name] || DEFAULT_AGENT_COLOR;
+}
+
+// --- Agent Selector Dropdown (portal) ---
+
+function AgentSelectorDropdown({ agents, currentAgent, suggestedAgent, position, onSelect, onClose }: {
+  agents: any[];
+  currentAgent: string | null;
+  suggestedAgent: string | null;
+  position: { top: number; left: number };
+  onSelect: (agentName: string | null) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleKey); };
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      ref={ref}
+      className="fixed z-[9999] min-w-[180px] py-1 rounded-md border border-glass-border shadow-elevated animate-filter-in"
+      style={{
+        top: position.top,
+        left: position.left,
+        background: 'rgba(15, 15, 18, 0.95)',
+        backdropFilter: 'blur(20px)',
+      }}
+    >
+      {/* Auto option */}
+      {suggestedAgent && (
+        <button
+          className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-text transition-colors duration-100 flex items-center gap-2"
+          onClick={() => onSelect(null)}
+        >
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: getAgentColor(suggestedAgent).text, opacity: 0.5 }} />
+          <span className="text-text-muted">Auto</span>
+          <span className="text-text-muted/50 ml-auto text-[10px]">{suggestedAgent}</span>
+        </button>
+      )}
+      {/* Remove agent */}
+      {currentAgent && (
+        <button
+          className="w-full text-left px-3 py-1.5 text-xs text-danger/70 hover:bg-[rgba(248,113,113,0.06)] hover:text-danger transition-colors duration-100"
+          onClick={() => onSelect(null)}
+        >
+          Remove agent
+        </button>
+      )}
+      {(currentAgent || suggestedAgent) && <div className="h-px my-1 bg-border/50" />}
+      {/* Agent list */}
+      {agents.map((agent: any) => {
+        const color = getAgentColor(agent.name);
+        const isActive = currentAgent === agent.name;
+        return (
+          <button
+            key={agent.name}
+            className={`w-full text-left px-3 py-1.5 text-xs transition-colors duration-100 flex items-center gap-2
+              ${isActive ? 'font-medium' : 'text-text-secondary hover:bg-surface-hover hover:text-text'}`}
+            style={isActive ? { background: color.bg, color: color.text } : undefined}
+            onClick={() => onSelect(agent.name)}
+          >
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color.text }} />
+            <span className="truncate">{agent.name}</span>
+            <span className="text-text-muted/40 text-[10px] ml-auto shrink-0">{agent.model}</span>
+          </button>
+        );
+      })}
+      {agents.length === 0 && (
+        <div className="px-3 py-2 text-xs text-text-muted/50 italic">Loading agents...</div>
+      )}
+    </div>,
+    document.body,
+  );
+}
+
 // --- Draggable Task Card ---
 
-function TaskCard({ task, columnKey, projectSlug, wiSlug, onEdit, onToggle, onRunTask, index, onDropOnCard }: {
+function TaskCard({ task, columnKey, projectSlug, wiSlug, onEdit, onToggle, onRunTask, onAgentChange, agents, suggestedAgent, index, onDropOnCard }: {
   task: any;
   columnKey: string;
   projectSlug: string;
@@ -43,12 +131,17 @@ function TaskCard({ task, columnKey, projectSlug, wiSlug, onEdit, onToggle, onRu
   onEdit: () => void;
   onToggle: () => void;
   onRunTask: () => void;
+  onAgentChange: (taskId: string, agentName: string | null) => void;
+  agents: any[];
+  suggestedAgent: string | null;
   index: number;
   onDropOnCard: (taskId: string, fromColumn: string, toColumn: string, toIndex: number) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const [closestEdge, setClosestEdge] = useState<Edge | null>(null);
+  const [agentSelectorOpen, setAgentSelectorOpen] = useState(false);
+  const [selectorPos, setSelectorPos] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     const el = ref.current;
@@ -189,10 +282,56 @@ function TaskCard({ task, columnKey, projectSlug, wiSlug, onEdit, onToggle, onRu
                   {task.priority}
                 </span>
               )}
-              {task.agent && (
-                <span className="inline-flex items-center px-[7px] py-px rounded-xs text-xxs font-medium font-mono tracking-[0.02em] border text-info bg-[rgba(96,165,250,0.05)] border-[rgba(96,165,250,0.08)]">
-                  {task.agent}
-                </span>
+              {/* Agent selector */}
+              {(() => {
+                const displayAgent = task.agent || suggestedAgent;
+                const isExplicit = !!task.agent;
+                const color = displayAgent ? getAgentColor(displayAgent) : null;
+                return (
+                  <button
+                    className={`inline-flex items-center gap-1 px-[7px] py-px rounded-xs text-xxs font-medium font-mono tracking-[0.02em] border transition-all duration-150 cursor-pointer hover:brightness-125
+                      ${!displayAgent ? 'border-border text-text-muted/40 hover:text-text-muted hover:border-border-light' : ''}
+                      ${displayAgent && isExplicit ? '' : ''}
+                      ${displayAgent && !isExplicit ? 'border-dashed' : ''}
+                    `}
+                    style={displayAgent && color ? {
+                      color: color.text,
+                      background: color.bg,
+                      borderColor: color.border,
+                      opacity: isExplicit ? 1 : 0.6,
+                    } : undefined}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const rect = (e.target as HTMLElement).getBoundingClientRect();
+                      setSelectorPos({ top: rect.bottom + 4, left: rect.left });
+                      setAgentSelectorOpen(!agentSelectorOpen);
+                    }}
+                    title={displayAgent ? (isExplicit ? `Agent: ${displayAgent}` : `Auto: ${displayAgent}`) : 'Assign agent'}
+                  >
+                    <Zap size={9} />
+                    {displayAgent ? (
+                      <>
+                        {!isExplicit && <span className="text-[8px] opacity-60">auto:</span>}
+                        {displayAgent}
+                      </>
+                    ) : (
+                      <span>agent</span>
+                    )}
+                  </button>
+                );
+              })()}
+              {agentSelectorOpen && (
+                <AgentSelectorDropdown
+                  agents={agents}
+                  currentAgent={task.agent || null}
+                  suggestedAgent={suggestedAgent}
+                  position={selectorPos}
+                  onSelect={(name) => {
+                    onAgentChange(task.id, name);
+                    setAgentSelectorOpen(false);
+                  }}
+                  onClose={() => setAgentSelectorOpen(false)}
+                />
               )}
               {task.tags?.map((tag: string) => (
                 <span key={tag} className="inline-flex items-center px-[7px] py-px rounded-xs text-xxs font-medium font-mono tracking-[0.02em] border border-border text-text-muted bg-pill">
@@ -214,7 +353,7 @@ function TaskCard({ task, columnKey, projectSlug, wiSlug, onEdit, onToggle, onRu
 
 // --- Drop Target Column ---
 
-function TaskColumn({ columnKey, label, tasks, projectSlug, wiSlug, onDrop, onEditTask, onToggleTask, onRunTask, onAddTask }: {
+function TaskColumn({ columnKey, label, tasks, projectSlug, wiSlug, onDrop, onEditTask, onToggleTask, onRunTask, onAgentChange, agents, agentSuggestions, onAddTask }: {
   columnKey: string;
   label: string;
   tasks: any[];
@@ -224,6 +363,9 @@ function TaskColumn({ columnKey, label, tasks, projectSlug, wiSlug, onDrop, onEd
   onEditTask: (task: any) => void;
   onToggleTask: (taskId: string, completed: boolean, fromColumn: string) => void;
   onRunTask: (taskId: string) => void;
+  onAgentChange: (taskId: string, agentName: string | null) => void;
+  agents: any[];
+  agentSuggestions: Record<string, string | null>;
   onAddTask: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -294,6 +436,9 @@ function TaskColumn({ columnKey, label, tasks, projectSlug, wiSlug, onDrop, onEd
               onEdit={() => onEditTask(task)}
               onToggle={() => onToggleTask(task.id, task.completed, columnKey)}
               onRunTask={() => onRunTask(task.id)}
+              onAgentChange={onAgentChange}
+              agents={agents}
+              suggestedAgent={agentSuggestions[task.id] ?? null}
               index={index}
               onDropOnCard={onDrop}
             />
@@ -324,6 +469,7 @@ export function TaskBoard({ projectSlug, wiSlug }: Props) {
   const [showFilter, setShowFilter] = useState(false);
   const [filter, setFilter] = useState<FilterState>(EMPTY_FILTER);
   const [showOutput, setShowOutput] = useState(false);
+  const [agents, setAgents] = useState<any[]>([]);
 
   const isRalphRunning = ralph.status === 'running' || ralph.status === 'paused';
   const isRalphForThisWI = ralph.workItemSlug === wiSlug || ralph.projectSlug === projectSlug;
@@ -331,6 +477,11 @@ export function TaskBoard({ projectSlug, wiSlug }: Props) {
   useEffect(() => {
     fetchWorkItems(projectSlug);
   }, [projectSlug, fetchWorkItems]);
+
+  // Fetch agents once
+  useEffect(() => {
+    api.getAgents().then(setAgents).catch(() => {});
+  }, []);
 
   const wi = useMemo(
     () => workItems.find((w) => w.slug === wiSlug || w.id === wiSlug),
@@ -414,6 +565,41 @@ export function TaskBoard({ projectSlug, wiSlug }: Props) {
       addToast('Failed to move task', 'error');
     }
   }, [wi, projectSlug, fetchWorkItems, addToast]);
+
+  const handleAgentChange = useCallback(async (taskId: string, agentName: string | null) => {
+    if (!wi) return;
+    try {
+      await api.updateTask(projectSlug, wi.slug, taskId, { agent: agentName || '' });
+      fetchWorkItems(projectSlug);
+    } catch {
+      addToast('Failed to assign agent', 'error');
+    }
+  }, [wi, projectSlug, fetchWorkItems, addToast]);
+
+  // Compute agent suggestions for tasks without explicit agent
+  const agentSuggestions = useMemo(() => {
+    const suggestions: Record<string, string | null> = {};
+    if (!wi || agents.length === 0) return suggestions;
+    for (const col of Object.values(wi.columns)) {
+      for (const task of col as any[]) {
+        if (task.agent) continue; // has explicit agent
+        if (!task.tags?.length) continue;
+        // Find best matching agent by tag overlap
+        let bestAgent: string | null = null;
+        let bestScore = 0;
+        for (const agent of agents) {
+          const matchCount = (task.tags as string[]).filter((tag: string) =>
+            (agent.skills || []).some((s: string) => s.toLowerCase() === tag.toLowerCase())
+          ).length;
+          if (matchCount === 0) continue;
+          const score = matchCount / (agent.skills?.length || 1);
+          if (score > bestScore) { bestScore = score; bestAgent = agent.name; }
+        }
+        if (bestAgent) suggestions[task.id] = bestAgent;
+      }
+    }
+    return suggestions;
+  }, [wi, agents]);
 
   const handleTaskSaved = useCallback(() => {
     setTaskModal(null);
@@ -640,6 +826,9 @@ export function TaskBoard({ projectSlug, wiSlug }: Props) {
             onEditTask={(task) => setTaskModal({ mode: 'edit', task })}
             onToggleTask={(taskId, completed) => handleToggleComplete(taskId, completed, key)}
             onRunTask={handleRunSingleTask}
+            onAgentChange={handleAgentChange}
+            agents={agents}
+            agentSuggestions={agentSuggestions}
             onAddTask={() => setTaskModal({ mode: 'create', column: key })}
           />
         ))}
