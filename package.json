@@ -1,6 +1,6 @@
 {
   "name": "kanbaii",
-  "version": "0.3.1",
+  "version": "0.3.4",
   "description": "The organization layer that Claude Code doesn't have. Plan visually, track progress, let AI execute.",
   "keywords": [
     "kanban",
@@ -52,10 +52,10 @@
     "dev:server": "tsx watch src/server/index.ts",
     "dev:frontend": "cd frontend && npm run dev",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:frontend\"",
-    "build:server": "tsc -p tsconfig.server.json",
-    "build:cli": "tsc -p tsconfig.cli.json",
+    "build:server": "tsc -p tsconfig.server.json && node -e \"const fs=require('fs'),p=require('path');const s='src/server/mcp',d='dist/server/mcp';fs.mkdirSync(d,{recursive:true});fs.readdirSync(s).filter(f=>f.endsWith('.js')).forEach(f=>fs.copyFileSync(p.join(s,f),p.join(d,f)));\"",
+    "build:cli": "tsc -p tsconfig.cli.json && node -e \"const fs=require('fs'),p=require('path');const s='src/server/mcp',d='dist/server/mcp';fs.mkdirSync(d,{recursive:true});fs.readdirSync(s).filter(f=>f.endsWith('.js')).forEach(f=>fs.copyFileSync(p.join(s,f),p.join(d,f)));\"",
     "build:frontend": "cd frontend && npm ci && npm run build && node -e \"const fs=require('fs');fs.rmSync('../dashboard',{recursive:true,force:true});fs.cpSync('out','../dashboard',{recursive:true});\"",
-    "build": "tsc -p tsconfig.cli.json && npm run build:frontend",
+    "build": "npm run build:cli && npm run build:frontend",
     "postbuild": "node -e \"require('fs').chmodSync('dist/cli/index.js', '755')\"",
     "prepublishOnly": "echo 'Build handled by CI'",
     "start": "node dist/server/index.js",
