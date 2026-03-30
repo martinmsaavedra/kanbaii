@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal as TerminalIcon, Square, RotateCcw, Clock, ChevronDown, Command } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import { useToastStore } from '@/stores/toastStore';
+import { useRouterStore } from '@/stores/routerStore';
 import { getSocket } from '@/lib/socket';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5555';
@@ -21,6 +22,13 @@ const COMMANDS = [
   { cmd: '/model <name>', desc: 'Switch Claude model' },
   { cmd: '/reset', desc: 'Reset terminal session' },
   { cmd: '/tasks', desc: 'List tasks in current work item' },
+];
+
+const SUGGESTED_PROMPTS = [
+  'Plan a new feature',
+  'Add a task to the board',
+  'Explain this codebase',
+  'What should I work on next?',
 ];
 
 function formatElapsed(ms: number): string {
@@ -45,6 +53,7 @@ export function TerminalView({ projectSlug }: { projectSlug: string }) {
   const [model, setModel] = useState('sonnet');
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
+  const [showChips, setShowChips] = useState(true);
 
   // Elapsed time
   const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -112,6 +121,7 @@ export function TerminalView({ projectSlug }: { projectSlug: string }) {
       term.loadAddon(fitAddon);
       term.open(termRef.current);
       fitAddon.fit();
+      term.focus();
 
       xtermRef.current = term;
       fitRef.current = fitAddon;
@@ -173,8 +183,10 @@ export function TerminalView({ projectSlug }: { projectSlug: string }) {
         body: JSON.stringify({ projectSlug, model, cols, rows }),
       });
       setSpawned(true);
+      setShowChips(false);
       setTerminalStatus('running');
       setStartedAt(Date.now());
+      if (xtermRef.current) xtermRef.current.focus();
     } catch { addToast('Failed to spawn terminal', 'error'); }
   }, [projectSlug, model, setTerminalStatus, addToast]);
 
@@ -194,6 +206,7 @@ export function TerminalView({ projectSlug }: { projectSlug: string }) {
     resetTerminal(); setSpawned(false); setStartedAt(null);
     if (xtermRef.current) xtermRef.current.clear();
     addToast('Terminal reset', 'info');
+    setShowChips(true);
   };
 
   const handlePaletteCmd = (cmd: string) => {
@@ -213,6 +226,26 @@ export function TerminalView({ projectSlug }: { projectSlug: string }) {
     }).catch(() => {});
   };
 
+  const handlePromptChip = (prompt: string) => {
+    setShowChips(false);
+    if (!spawned) {
+      // Auto-spawn then send
+      handleSpawn().then(() => {
+        setTimeout(() => {
+          fetch(`${API}/api/terminal/input`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectSlug, data: prompt + '\r' }),
+          }).catch(() => {});
+        }, 2000); // Wait for Claude CLI to initialize
+      });
+    } else {
+      fetch(`${API}/api/terminal/input`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectSlug, data: prompt + '\r' }),
+      }).catch(() => {});
+    }
+  };
+
   // Keyboard shortcut for command palette
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -224,6 +257,15 @@ export function TerminalView({ projectSlug }: { projectSlug: string }) {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  // Auto-focus terminal when the console tab becomes active
+  const currentView = useRouterStore((s) => s.view);
+  useEffect(() => {
+    if (xtermRef.current && currentView === 'console') {
+      const timer = setTimeout(() => xtermRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [currentView]);
 
   const isRunning = terminalStatus === 'running';
 
@@ -311,6 +353,27 @@ export function TerminalView({ projectSlug }: { projectSlug: string }) {
       {/* Terminal area */}
       <div className="flex-1 relative overflow-hidden bg-[var(--console-bg)]">
         <div ref={termRef} className="w-full h-full px-3 py-2" />
+
+        {/* Suggested prompt chips */}
+        {showChips && !spawned && (
+          <div className="absolute inset-0 flex items-center justify-center z-[5] pointer-events-none">
+            <div className="flex flex-wrap gap-2 justify-center max-w-[480px] pointer-events-auto">
+              {SUGGESTED_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  onClick={() => handlePromptChip(prompt)}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium font-mono
+                             text-text-muted/70 bg-surface/60 border border-border/40
+                             backdrop-blur-sm transition-all duration-150 ease-out-expo
+                             hover:text-accent hover:border-accent/30 hover:bg-accent/[0.06]
+                             hover:shadow-[0_0_12px_rgba(99,102,241,0.15)]"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Command Palette Overlay */}
         {showPalette && (
