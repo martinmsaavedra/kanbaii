@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 export interface McpServer {
@@ -14,6 +15,7 @@ export interface McpConfig {
 }
 
 const DATA_DIR = path.resolve(process.env.KANBAII_DATA_DIR || path.join(process.cwd(), 'data', 'projects'));
+const KANBAII_ROOT = path.resolve(__dirname, '..', '..', '..');
 const CONFIG_FILE = path.join(DATA_DIR, '..', '.mcp-config.json');
 
 function ensureFile(): void {
@@ -182,7 +184,9 @@ export function generateMcpConfigForClaude(onlyKanbaii: boolean = true): string 
     }
   }
 
-  const tmpFile = path.join(DATA_DIR, '..', onlyKanbaii ? '.mcp-runtime-minimal.json' : '.mcp-runtime.json');
+  const runtimeDir = path.join(os.tmpdir(), 'kanbaii');
+  if (!fs.existsSync(runtimeDir)) fs.mkdirSync(runtimeDir, { recursive: true });
+  const tmpFile = path.join(runtimeDir, onlyKanbaii ? '.mcp-runtime-minimal.json' : '.mcp-runtime.json');
   fs.writeFileSync(tmpFile, JSON.stringify({ mcpServers: mcpConfig }, null, 2), 'utf-8');
   return tmpFile;
 }
