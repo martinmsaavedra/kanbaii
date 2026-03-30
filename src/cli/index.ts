@@ -26,6 +26,38 @@ program
   .action(async (opts) => {
     printBanner();
 
+    // Auto-rebuild dashboard if running from dev environment with stale build
+    const frontendDir = path.join(__dirname, '..', '..', 'frontend');
+    const dashboardIndex = path.join(__dirname, '..', '..', 'dashboard', 'index.html');
+    if (fs.existsSync(path.join(frontendDir, 'package.json'))) {
+      const dashboardTime = fs.existsSync(dashboardIndex)
+        ? fs.statSync(dashboardIndex).mtimeMs : 0;
+      const srcDirs = ['components', 'app', 'stores', 'hooks', 'lib', 'contexts'].map(d => path.join(frontendDir, d));
+      let needsRebuild = false;
+      for (const dir of srcDirs) {
+        if (!fs.existsSync(dir)) continue;
+        const files = fs.readdirSync(dir, { recursive: true }) as string[];
+        if (files.some(f => fs.statSync(path.join(dir, f)).mtimeMs > dashboardTime)) {
+          needsRebuild = true;
+          break;
+        }
+      }
+      if (needsRebuild) {
+        console.log('  \x1b[33m◇\x1b[0m Frontend changes detected, rebuilding dashboard...');
+        const { execSync } = require('child_process');
+        try {
+          const projectRoot = path.join(__dirname, '..', '..');
+          execSync('npm run build:frontend', { cwd: projectRoot, stdio: 'pipe' });
+          console.log('  \x1b[32m◇\x1b[0m Dashboard rebuilt successfully.');
+          console.log('');
+        } catch (err: any) {
+          console.log('  \x1b[31m✗\x1b[0m Dashboard rebuild failed. Using last build.');
+          console.log(`    ${err.message?.split('\n')[0] || 'Unknown error'}`);
+          console.log('');
+        }
+      }
+    }
+
     // Pre-flight: check claude exists AND is authenticated
     const claudePath = findClaudePath();
     if (!claudePath) {
