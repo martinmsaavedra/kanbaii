@@ -12,9 +12,9 @@
 </h1>
 
 <p align="center">
-  <strong>The organization layer that Claude Code doesn't have.</strong>
+  <strong>Visual cockpit for Claude Code.</strong>
   <br />
-  <sub>Plan visually. Track progress. Let AI execute. All local, all yours.</sub>
+  <sub>Same engine. Better cockpit. Plan visually, track progress, let AI execute.</sub>
 </p>
 
 <p align="center">
@@ -28,15 +28,15 @@
 
 ---
 
-## The Problem
+## Why KANBAII
 
-**Claude Code is incredible at executing.** You give it a task, it does it. But when your project has 15 features, 8 bugs, and 3 refactors — all at different stages — Claude Code doesn't know where you left off, what's next, or what the big picture looks like.
+**Claude Code is the engine. KANBAII is the cockpit.**
 
-You need a board. You need structure. You need to see the whole battlefield.
+You can manage a project from the terminal. But when your project has 15 features, 8 bugs, and 3 refactors — opening a browser and seeing everything as a kanban board, dragging priorities, reading plans, and launching agents that work your backlog — that's a different experience.
 
-**That's KANBAII.** A visual kanban board that sits on top of Claude Code. Organize your work, track progress across work items, and when you're ready — hit play and let AI execute the tasks for you.
+KANBAII is a visual kanban board that sits on top of Claude Code. Organize your work visually, plan with AI, and when you're ready — hit play and watch your agents execute.
 
-> KANBAII doesn't replace Claude Code. It gives Claude Code a mission control.
+> Same engine. Better cockpit.
 
 ---
 
