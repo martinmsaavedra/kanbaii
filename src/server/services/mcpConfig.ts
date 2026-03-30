@@ -117,6 +117,12 @@ export function getPresets(): McpServer[] {
   return MCP_PRESETS;
 }
 
+// Command safety — only allow known executables
+const ALLOWED_COMMANDS = new Set([
+  'node', 'npx', 'cmd', 'cmd.exe', 'python', 'python3', 'uvx', 'pip', 'pipx',
+]);
+const SHELL_META = /[;&|`$(){}!<>\\"\n\r]/;
+
 /**
  * Test if an MCP server can be spawned and responds.
  * Spawns the command, waits briefly, and checks if process is alive.
@@ -124,6 +130,17 @@ export function getPresets(): McpServer[] {
 export async function testServer(name: string): Promise<{ ok: boolean; message: string }> {
   const server = getServer(name);
   if (!server) return { ok: false, message: 'Server not found' };
+
+  // Validate command before spawning
+  const cmdBase = (server.command.split(/[\\/]/).pop() || server.command).toLowerCase();
+  if (!ALLOWED_COMMANDS.has(cmdBase)) {
+    return { ok: false, message: `Command not allowed: ${server.command}` };
+  }
+  for (const arg of server.args || []) {
+    if (typeof arg !== 'string' || SHELL_META.test(arg)) {
+      return { ok: false, message: 'Invalid argument: contains shell metacharacters' };
+    }
+  }
 
   const { spawn } = require('child_process');
   return new Promise((resolve) => {

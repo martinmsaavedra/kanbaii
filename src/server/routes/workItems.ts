@@ -2,8 +2,12 @@ import { Router, Request, Response } from 'express';
 import * as workItemStore from '../services/workItemStore';
 import { emit } from '../lib/typedEmit';
 import { ZodError } from 'zod';
+import { validateSlugParam } from '../lib/validateSlug';
 
 const router = Router({ mergeParams: true });
+
+// Validate :wiId param for all routes in this router
+router.param('wiId', (req, res, next) => validateSlugParam('wiId')(req, res, next));
 
 // GET /api/projects/:slug/work-items
 router.get('/', (req: Request, res: Response) => {

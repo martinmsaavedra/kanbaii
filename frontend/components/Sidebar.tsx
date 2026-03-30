@@ -48,7 +48,12 @@ export function Sidebar() {
 
   useEffect(() => {
     if (!menuOpen) return;
-    const handler = () => setMenuOpen(null);
+    const handler = (e: MouseEvent) => {
+      // Don't close if clicking inside the menu itself (e.g. confirm delete)
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-context-menu]')) return;
+      setMenuOpen(null);
+    };
     const timer = setTimeout(() => document.addEventListener('click', handler), 0);
     return () => { clearTimeout(timer); document.removeEventListener('click', handler); };
   }, [menuOpen]);
@@ -291,7 +296,7 @@ export function Sidebar() {
                     {menuOpen === project.slug && isExpanded && (
                       <div
                         className="absolute right-1 top-full mt-0.5 min-w-[160px] bg-glass backdrop-blur-[12px] backdrop-saturate-[160%]
-                                   border border-glass-border rounded-md shadow-elevated z-[100] py-1 overflow-hidden animate-filter-in"
+                                   border border-glass-border rounded-md shadow-elevated z-[100] py-1 overflow-hidden animate-filter-in" data-context-menu
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
@@ -363,7 +368,7 @@ export function Sidebar() {
                       {menuOpen === project.slug && (
                         <div
                           className="absolute right-1 top-full mt-0.5 min-w-[160px] bg-glass backdrop-blur-[12px] backdrop-saturate-[160%]
-                                     border border-glass-border rounded-md shadow-elevated z-[100] py-1 overflow-hidden animate-filter-in"
+                                     border border-glass-border rounded-md shadow-elevated z-[100] py-1 overflow-hidden animate-filter-in" data-context-menu
                           onClick={(e) => e.stopPropagation()}
                         >
                           <button
@@ -418,7 +423,7 @@ export function Sidebar() {
                       {menuOpen === project.slug && (
                         <div
                           className="absolute right-1 top-full mt-0.5 min-w-[160px] bg-glass backdrop-blur-[12px] backdrop-saturate-[160%]
-                                     border border-glass-border rounded-md shadow-elevated z-[100] py-1 overflow-hidden animate-filter-in"
+                                     border border-glass-border rounded-md shadow-elevated z-[100] py-1 overflow-hidden animate-filter-in" data-context-menu
                           onClick={(e) => e.stopPropagation()}
                         >
                           <button

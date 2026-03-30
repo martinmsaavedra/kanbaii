@@ -1,4 +1,5 @@
 import express from 'express';
+import helmet from 'helmet';
 import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -32,6 +33,8 @@ import voiceRoutes from './routes/voice';
 import escalationRoutes from './routes/escalation';
 import plannerRoutes from './routes/planner';
 import { authMiddleware } from './lib/authMiddleware';
+import { isAuthEnabled, verifyToken } from './services/authService';
+import { validateSlugParam } from './lib/validateSlug';
 import { requestLogger } from './lib/requestLogger';
 import { apiLimiter, authLimiter, executionLimiter, voiceLimiter } from './lib/rateLimiter';
 import { startPolling as startUsagePolling } from './services/claudeUsage';
@@ -57,7 +60,35 @@ export function createApp() {
   });
   setIO(io);
 
-  // Middleware
+  // Socket.IO auth — validates JWT when auth is enabled
+  io.use((socket, next) => {
+    if (!isAuthEnabled()) return next();
+    const token = socket.handshake.auth?.token
+      || socket.handshake.headers?.authorization?.replace('Bearer ', '');
+    if (!token) return next(new Error('Authentication required'));
+    const payload = verifyToken(token);
+    if (!payload) return next(new Error('Invalid or expired token'));
+    (socket as any).userId = payload.userId;
+    (socket as any).username = payload.username;
+    next();
+  });
+
+  // Middleware — security headers first
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        connectSrc: ["'self'", "ws:", "wss:", `http://localhost:${PORT}`, "http://localhost:3000"],
+        fontSrc: ["'self'", "data:"],
+        frameSrc: ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    xFrameOptions: { action: 'deny' },
+  }));
   app.use(cors({ origin: allowedOrigins }));
   app.use(express.json({ limit: '2mb' }));
   app.use(requestLogger);
@@ -72,23 +103,32 @@ export function createApp() {
   app.use('/api/teams/start', executionLimiter);
   app.use('/api/voice', voiceLimiter);
 
-  // Health
-  app.get('/api/health', (_req, res) => {
-    const mem = process.memoryUsage();
-    res.json({
-      ok: true,
-      version: require('../../package.json').version,
-      uptime: Math.floor(process.uptime()),
-      memory: {
-        heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
-        heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
-        rssMB: Math.round(mem.rss / 1024 / 1024),
-      },
-      node: process.version,
-      platform: process.platform,
-      cwd: process.cwd(),
-    });
+  // Health — full diagnostics only when authenticated or auth disabled
+  app.get('/api/health', (req, res) => {
+    const version = require('../../package.json').version;
+    const basic = { ok: true, version };
+
+    if (!isAuthEnabled() || (req as any).userId) {
+      const mem = process.memoryUsage();
+      return res.json({
+        ...basic,
+        uptime: Math.floor(process.uptime()),
+        memory: {
+          heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+          heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
+          rssMB: Math.round(mem.rss / 1024 / 1024),
+        },
+        node: process.version,
+        platform: process.platform,
+      });
+    }
+
+    res.json(basic);
   });
+
+  // Slug parameter validation
+  app.param('slug', (req, _res, next, _val) => validateSlugParam('slug')(req, _res, next));
+  app.param('wiId', (req, _res, next, _val) => validateSlugParam('wiId')(req, _res, next));
 
   // API Routes
   app.use('/api/projects', projectRoutes);

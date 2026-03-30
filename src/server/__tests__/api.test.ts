@@ -129,9 +129,10 @@ describe('Projects API', () => {
     const res = await request('DELETE', '/api/projects/bye');
     expect(res.status).toBe(200);
 
-    // Should not appear in list (soft deleted)
+    // Still in list but with status 'deleted' (frontend filters)
     const list = await request('GET', '/api/projects');
-    expect(list.body.data).toHaveLength(0);
+    expect(list.body.data).toHaveLength(1);
+    expect(list.body.data[0].status).toBe('deleted');
   });
 
   it('POST /api/projects — 400 on invalid input', async () => {
@@ -322,5 +323,79 @@ describe('Tasks API', () => {
       title: 'Updated',
     });
     expect(res.status).toBe(404);
+  });
+});
+
+// ===== Slug Validation =====
+
+describe('Slug validation', () => {
+  it('rejects uppercase slug in projects', async () => {
+    const res = await request('GET', '/api/projects/MyProject');
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects special chars in slug', async () => {
+    const res = await request('GET', '/api/projects/test;rm');
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects slug with spaces', async () => {
+    const res = await request('GET', '/api/projects/my project');
+    expect(res.status).toBe(400);
+  });
+
+  it('allows valid lowercase-hyphen slug', async () => {
+    // Should get 404 (not found) not 400 (invalid slug)
+    const res = await request('GET', '/api/projects/valid-slug');
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects uppercase in work item wiId', async () => {
+    await request('POST', '/api/projects', { title: 'Slug Test' });
+    const res = await request('GET', '/api/projects/slug-test/work-items/InvalidSlug');
+    expect(res.status).toBe(400);
+  });
+});
+
+// ===== Input Size Limits =====
+
+describe('Input size limits', () => {
+  it('rejects project title over 100 chars', async () => {
+    const res = await request('POST', '/api/projects', { title: 'a'.repeat(101) });
+    expect(res.status).toBe(400);
+  });
+
+  it('accepts project title at 100 chars', async () => {
+    const res = await request('POST', '/api/projects', { title: 'a'.repeat(100) });
+    expect(res.status).toBe(201);
+  });
+
+  it('rejects project description over 500 chars', async () => {
+    const res = await request('POST', '/api/projects', {
+      title: 'Test',
+      description: 'a'.repeat(501),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects task description over 2000 chars', async () => {
+    await request('POST', '/api/projects', { title: 'Limit Test' });
+    const wi = await request('POST', '/api/projects/limit-test/work-items', {
+      title: 'WI', category: 'feature',
+    });
+    const res = await request('POST', `/api/projects/limit-test/work-items/${wi.body.data.slug}/tasks`, {
+      title: 'Task',
+      description: 'a'.repeat(2001),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects work item title over 200 chars', async () => {
+    await request('POST', '/api/projects', { title: 'Limit Test 2' });
+    const res = await request('POST', '/api/projects/limit-test-2/work-items', {
+      title: 'a'.repeat(201),
+      category: 'feature',
+    });
+    expect(res.status).toBe(400);
   });
 });

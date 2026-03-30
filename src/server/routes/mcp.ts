@@ -3,6 +3,27 @@ import * as mcpConfig from '../services/mcpConfig';
 
 const router = Router();
 
+// Command whitelist — only known safe executables
+const ALLOWED_COMMANDS = new Set([
+  'node', 'npx', 'cmd', 'cmd.exe', 'python', 'python3', 'uvx', 'pip', 'pipx',
+]);
+
+// Shell metacharacter pattern — reject args that could enable injection
+const SHELL_META = /[;&|`$(){}!<>\\"\n\r]/;
+
+function validateMcpCommand(command: string, args: unknown[]): string | null {
+  const cmdBase = (command.split(/[\\/]/).pop() || command).toLowerCase();
+  if (!ALLOWED_COMMANDS.has(cmdBase)) {
+    return `Command not allowed: ${command}. Allowed: ${[...ALLOWED_COMMANDS].join(', ')}`;
+  }
+  for (const arg of args) {
+    if (typeof arg !== 'string' || SHELL_META.test(arg)) {
+      return 'Invalid argument: contains shell metacharacters';
+    }
+  }
+  return null;
+}
+
 // GET /api/mcp/servers
 router.get('/servers', (_req: Request, res: Response) => {
   res.json({ ok: true, data: mcpConfig.listServers() });
@@ -19,7 +40,14 @@ router.post('/servers', (req: Request, res: Response) => {
   if (!name || !command) {
     return res.status(400).json({ ok: false, error: 'name and command are required' });
   }
-  const server = mcpConfig.addServer({ name, command, args: args || [], env: env || {}, enabled: enabled !== false });
+
+  const argList: string[] = args || [];
+  const validationError = validateMcpCommand(command, argList);
+  if (validationError) {
+    return res.status(400).json({ ok: false, error: validationError });
+  }
+
+  const server = mcpConfig.addServer({ name, command, args: argList, env: env || {}, enabled: enabled !== false });
   res.json({ ok: true, data: server });
 });
 

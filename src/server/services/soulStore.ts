@@ -161,6 +161,14 @@ export function resetMemory(projectSlug: string): void {
 
 // ─── Daily Logs ───
 
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function validateDate(date: string): void {
+  if (!DATE_PATTERN.test(date)) {
+    throw new Error('Invalid date format: must be YYYY-MM-DD');
+  }
+}
+
 export function listDailyLogs(projectSlug: string): DailyLog[] {
   ensureSoulDir(projectSlug);
   const dir = logsDir(projectSlug);
@@ -180,6 +188,7 @@ export function listDailyLogs(projectSlug: string): DailyLog[] {
 }
 
 export function getDailyLog(projectSlug: string, date: string): DailyLog | null {
+  validateDate(date);
   const filePath = path.join(logsDir(projectSlug), `${date}.md`);
   if (!fs.existsSync(filePath)) return null;
   const content = fs.readFileSync(filePath, 'utf-8');
@@ -189,6 +198,7 @@ export function getDailyLog(projectSlug: string, date: string): DailyLog | null 
 export function appendDailyLog(projectSlug: string, entry: string, date?: string): void {
   ensureSoulDir(projectSlug);
   const d = date || new Date().toISOString().split('T')[0];
+  validateDate(d);
   const filePath = path.join(logsDir(projectSlug), `${d}.md`);
   const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
   const line = `- [${timestamp}] ${entry}\n`;
