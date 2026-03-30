@@ -216,7 +216,7 @@ export function Sidebar() {
                 const rgb = hexToRgb(project.color);
 
                 return (
-                  <div key={project.id} className="relative mb-0.5 group">
+                  <div key={project.id} className={`relative mb-0.5 group ${menuOpen === project.slug ? 'z-[200]' : ''}`}>
                     <button
                       className={`w-full rounded-sm text-left flex items-center transition-all duration-200 cursor-pointer
                                   ${isExpanded ? 'py-3 px-3.5 justify-start gap-3' : 'py-2.5 px-0 justify-center gap-0'}
@@ -338,7 +338,7 @@ export function Sidebar() {
                     Archived ({archivedProjects.length})
                   </button>
                   {showArchived && archivedProjects.map((project) => (
-                    <div key={project.id} className="relative mb-0.5 group opacity-50 hover:opacity-70 transition-opacity">
+                    <div key={project.id} className={`relative mb-0.5 group opacity-50 hover:opacity-70 transition-opacity ${menuOpen === project.slug ? 'z-[200]' : ''}`}>
                       <button
                         className="w-full rounded-sm text-left flex items-center transition-all duration-200 cursor-pointer py-2 px-3.5 justify-start gap-3
                                    bg-transparent border border-transparent hover:bg-surface"
@@ -397,7 +397,7 @@ export function Sidebar() {
                     Trash ({trashedProjects.length})
                   </button>
                   {showTrash && trashedProjects.map((project) => (
-                    <div key={project.id} className="relative mb-0.5 group opacity-40 hover:opacity-60 transition-opacity">
+                    <div key={project.id} className={`relative mb-0.5 group opacity-40 hover:opacity-60 transition-opacity ${menuOpen === project.slug ? 'z-[200]' : ''}`}>
                       <div className="w-full rounded-sm text-left flex items-center py-2 px-3.5 justify-start gap-3">
                         <div className="w-2 h-2 rounded-full flex-shrink-0 opacity-50" style={{ background: project.color }} />
                         <span className="text-xs font-medium whitespace-nowrap overflow-hidden text-ellipsis tracking-tight text-text-muted line-through flex-1 min-w-0">
