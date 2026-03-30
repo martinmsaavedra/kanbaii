@@ -40,7 +40,6 @@ coverage/
 # AI tooling (user-specific)
 .claude/
 .superpowers/
-CLAUDE.md
 
 # Private docs & plans (not part of the package)
 docs/
