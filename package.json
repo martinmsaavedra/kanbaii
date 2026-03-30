@@ -1,7 +1,7 @@
 {
   "name": "kanbaii",
   "version": "0.3.5",
-  "description": "The organization layer that Claude Code doesn't have. Plan visually, track progress, let AI execute.",
+  "description": "Visual cockpit for Claude Code. Plan visually, track progress, let AI execute. Same engine, better cockpit.",
   "keywords": [
     "kanban",
     "claude",
