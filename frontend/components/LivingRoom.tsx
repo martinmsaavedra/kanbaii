@@ -31,7 +31,12 @@ export function LivingRoom({ projectSlug }: { projectSlug: string }) {
     if (logsRef.current) logsRef.current.scrollTop = logsRef.current.scrollHeight;
   }, [teams.logs]);
 
-  const runnableWIs = workItems.filter((wi) => wi.columns['todo']?.length > 0);
+  // Show work items that have ANY pending tasks (not done)
+  const countPendingTasks = (wi: typeof workItems[0]) =>
+    (wi.columns['backlog']?.length || 0) + (wi.columns['todo']?.length || 0) +
+    (wi.columns['in-progress']?.length || 0) + (wi.columns['review']?.length || 0);
+
+  const runnableWIs = workItems.filter((wi) => countPendingTasks(wi) > 0);
 
   const toggleWI = (slug: string) => {
     setSelectedWIs((s) => s.includes(slug) ? s.filter((x) => x !== slug) : [...s, slug]);
@@ -52,9 +57,9 @@ export function LivingRoom({ projectSlug }: { projectSlug: string }) {
     await fetch(`${API}/api/teams/stop`, { method: 'POST' });
   };
 
-  const totalTodo = selectedWIs.reduce((sum, slug) => {
+  const totalPending = selectedWIs.reduce((sum, slug) => {
     const wi = workItems.find((w) => w.slug === slug);
-    return sum + (wi?.columns['todo']?.length || 0);
+    return sum + (wi ? countPendingTasks(wi) : 0);
   }, 0);
 
   const activeWorkers = teams.workers.filter((w) => w.status === 'running');
@@ -83,7 +88,7 @@ export function LivingRoom({ projectSlug }: { projectSlug: string }) {
             onClick={handleStart}
             disabled={selectedWIs.length === 0}
           >
-            <Play size={14} /> Start Teams ({totalTodo} tasks)
+            <Play size={14} /> Start Teams ({totalPending} tasks)
           </button>
         )}
       </div>
@@ -94,7 +99,7 @@ export function LivingRoom({ projectSlug }: { projectSlug: string }) {
           <div className="text-xxs font-semibold text-text-muted uppercase tracking-[0.1em] font-mono mb-2.5">Work Items</div>
           <div className="flex flex-col gap-[3px]">
             {runnableWIs.length === 0 ? (
-              <div className="text-text-muted text-data text-center py-8 px-4 font-mono tracking-wide opacity-40">No work items with tasks in To Do</div>
+              <div className="text-text-muted text-data text-center py-8 px-4 font-mono tracking-wide opacity-40">No pending work items</div>
             ) : (
               runnableWIs.map((wi) => (
                 <label key={wi.slug} className="flex items-center gap-2 py-[7px] px-2 rounded-sm text-xs text-text-secondary cursor-pointer transition-all duration-150 ease-out-expo border border-transparent hover:bg-surface-hover hover:border-border">
@@ -106,7 +111,7 @@ export function LivingRoom({ projectSlug }: { projectSlug: string }) {
                     className="accent-accent w-3.5 h-3.5"
                   />
                   <span>{wi.title}</span>
-                  <span className="ml-auto text-xxs text-text-muted bg-pill px-1.5 py-0.5 rounded-xs font-mono border border-[rgba(148,163,242,0.04)]">{wi.columns['todo']?.length || 0}</span>
+                  <span className="ml-auto text-xxs text-text-muted bg-pill px-1.5 py-0.5 rounded-xs font-mono border border-[rgba(148,163,242,0.04)]">{countPendingTasks(wi)}</span>
                 </label>
               ))
             )}
