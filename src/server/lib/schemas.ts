@@ -12,8 +12,8 @@ export const ProjectStatusSchema = z.enum(['active', 'archived', 'deleted']);
 // --- Plan ---
 
 export const PlanSchema = z.object({
-  prompt: z.string().optional(),
-  content: z.string().optional(),
+  prompt: z.string().max(50000).optional(),
+  content: z.string().max(100000).optional(),
   status: z.enum(['empty', 'draft', 'approved']),
   generatedBy: z.enum(['claude', 'manual']).optional(),
   createdAt: z.string().optional(),
@@ -32,8 +32,8 @@ export const TaskSummarySchema = z.object({
 
 export const TaskSchema = z.object({
   id: z.string().min(1),
-  title: z.string().min(1),
-  description: z.string(),
+  title: z.string().min(1).max(200),
+  description: z.string().max(5000),
   completed: z.boolean(),
   model: ClaudeModelSchema,
   priority: PrioritySchema.optional(),
@@ -45,7 +45,7 @@ export const TaskSchema = z.object({
   updatedAt: z.string().optional(),
   completedAt: z.string().optional(),
   previousColumn: z.string().optional(),
-  output: z.string().optional(),
+  output: z.string().max(100000).optional(),
   summary: TaskSummarySchema.optional(),
 });
 
@@ -62,7 +62,7 @@ export const ColumnsSchema = z.object({
 export const WorkItemSchema = z.object({
   id: z.string().min(1),
   slug: z.string().min(1),
-  title: z.string().min(1),
+  title: z.string().min(1).max(200),
   category: WorkItemCategorySchema,
   status: WorkItemStatusSchema,
   linkedWorkItem: z.string().nullable().optional(),
@@ -77,8 +77,8 @@ export const WorkItemSchema = z.object({
 export const ProjectSchema = z.object({
   id: z.string().min(1),
   slug: z.string().min(1),
-  title: z.string().min(1),
-  description: z.string().optional(),
+  title: z.string().min(1).max(200),
+  description: z.string().max(5000).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Invalid hex color'),
   workingDir: z.string().optional(),
   status: ProjectStatusSchema,
@@ -143,7 +143,7 @@ export const UpdateTaskDto = z.object({
   agent: z.string().nullable().optional(),
   depends: z.array(z.string()).optional(),
   due: z.string().optional(),
-  output: z.string().optional(),
+  output: z.string().max(100000).optional(),
   summary: TaskSummarySchema.optional(),
 });
 
