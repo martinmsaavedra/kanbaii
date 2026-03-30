@@ -1,7 +1,50 @@
 import { getIO } from '../lib/typedEmit';
+import fs from 'fs';
+import path from 'path';
 
 let pty: any = null;
 try { pty = require('node-pty'); } catch { console.warn('[terminal] node-pty not available'); }
+
+/**
+ * Write a .mcp.json in the project's workingDir so Claude auto-discovers
+ * KANBAII's MCP server. Removed on session kill.
+ */
+function ensureProjectMcp(workingDir: string): void {
+  const mcpPath = path.join(workingDir, '.mcp.json');
+  if (fs.existsSync(mcpPath)) return; // don't overwrite user's existing config
+
+  const kanbaiiMcpServer = path.resolve(__dirname, '..', 'mcp', 'kanbaii-mcp-server.js');
+  if (!fs.existsSync(kanbaiiMcpServer)) return;
+
+  const config = {
+    mcpServers: {
+      kanbaii: {
+        command: 'node',
+        args: [kanbaiiMcpServer],
+        env: {
+          KANBAII_PORT: process.env.KANBAII_PORT || '5555',
+          KANBAII_HOST: 'localhost',
+        },
+      },
+    },
+  };
+
+  try {
+    fs.writeFileSync(mcpPath, JSON.stringify(config, null, 2), 'utf-8');
+  } catch { /* silent — non-critical */ }
+}
+
+function cleanupProjectMcp(workingDir: string): void {
+  const mcpPath = path.join(workingDir, '.mcp.json');
+  try {
+    if (!fs.existsSync(mcpPath)) return;
+    const content = JSON.parse(fs.readFileSync(mcpPath, 'utf-8'));
+    // Only remove if it's ours (has kanbaii server and nothing else)
+    if (content?.mcpServers?.kanbaii && Object.keys(content.mcpServers).length === 1) {
+      fs.unlinkSync(mcpPath);
+    }
+  } catch { /* silent */ }
+}
 
 export interface TerminalSession {
   id: string;
@@ -39,6 +82,10 @@ export function spawnPty(projectSlug: string, workingDir: string, opts?: { model
   const shell = isWindows ? 'cmd.exe' : '/bin/bash';
   const validModels = ['opus', 'sonnet', 'haiku'];
   const model = opts?.model && validModels.includes(opts.model) ? opts.model : undefined;
+
+  // Drop .mcp.json in project dir so Claude auto-discovers KANBAII tools
+  ensureProjectMcp(workingDir);
+
   const claudeCmd = `claude${model ? ` --model ${model}` : ''}`;
   const shellArgs = isWindows ? ['/c', claudeCmd] : ['-c', claudeCmd];
 
@@ -83,7 +130,11 @@ export function resizeTerminal(projectSlug: string, cols: number, rows: number):
 
 export function killSession(projectSlug: string): void {
   const session = sessions.get(projectSlug);
-  if (session?.proc) { session.proc.kill(); session.proc = null; session.status = 'idle'; }
+  if (session) {
+    cleanupProjectMcp(session.workingDir);
+    if (session.proc) { session.proc.kill(); session.proc = null; }
+    session.status = 'idle';
+  }
 }
 
 export function resetSession(projectSlug: string): void {
