@@ -3,7 +3,16 @@ import os from 'os';
 
 const ALGORITHM = 'aes-256-gcm';
 
+if (!process.env.KANBAII_SECRET) {
+  console.warn('[kanbaii] \u26a0 KANBAII_SECRET not set \u2014 using machine-specific encryption key. Set KANBAII_SECRET env var for portable encryption.');
+}
+
 function deriveKey(): Buffer {
+  const envSecret = process.env.KANBAII_SECRET;
+  if (envSecret) {
+    return crypto.scryptSync(envSecret, 'kanbaii-env-salt', 32);
+  }
+  // Fallback: machine-specific key
   const material = [os.hostname(), os.homedir(), 'kanbaii-v1'].join(':');
   return crypto.scryptSync(material, 'kanbaii-salt', 32);
 }
