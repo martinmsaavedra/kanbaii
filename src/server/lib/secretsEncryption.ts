@@ -7,14 +7,19 @@ if (!process.env.KANBAII_SECRET) {
   console.warn('[kanbaii] \u26a0 KANBAII_SECRET not set \u2014 using machine-specific encryption key. Set KANBAII_SECRET env var for portable encryption.');
 }
 
+// Cache derived key — scryptSync is deliberately slow (~100ms), must only run once
+let _cachedKey: Buffer | null = null;
+
 function deriveKey(): Buffer {
+  if (_cachedKey) return _cachedKey;
   const envSecret = process.env.KANBAII_SECRET;
   if (envSecret) {
-    return crypto.scryptSync(envSecret, 'kanbaii-env-salt', 32);
+    _cachedKey = crypto.scryptSync(envSecret, 'kanbaii-env-salt', 32);
+  } else {
+    const material = [os.hostname(), os.homedir(), 'kanbaii-v1'].join(':');
+    _cachedKey = crypto.scryptSync(material, 'kanbaii-salt', 32);
   }
-  // Fallback: machine-specific key
-  const material = [os.hostname(), os.homedir(), 'kanbaii-v1'].join(':');
-  return crypto.scryptSync(material, 'kanbaii-salt', 32);
+  return _cachedKey;
 }
 
 export function encrypt(text: string): string {
