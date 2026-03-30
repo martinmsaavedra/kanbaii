@@ -1,6 +1,6 @@
 {
   "name": "kanbaii",
-  "version": "0.3.5",
+  "version": "0.4.0",
   "description": "Visual cockpit for Claude Code. Plan visually, track progress, let AI execute. Same engine, better cockpit.",
   "keywords": [
     "kanban",
@@ -70,6 +70,7 @@
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "express-rate-limit": "^8.3.1",
+    "helmet": "^8.1.0",
     "socket.io": "^4.7.5",
     "update-notifier": "^6.0.2",
     "zod": "^3.25.76"
