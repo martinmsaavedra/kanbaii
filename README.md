@@ -215,6 +215,14 @@ npm test
 
 ---
 
+## Support
+
+If you find KANBAII useful, consider giving it a star on GitHub — it helps others discover the project.
+
+[![Star on GitHub](https://img.shields.io/github/stars/martinmsaavedra/kanbaii?style=social)](https://github.com/martinmsaavedra/kanbaii)
+
+---
+
 <p align="center">
   <sub>Built by <a href="https://github.com/martinmsaavedra">Martin Saavedra</a></sub>
   <br />

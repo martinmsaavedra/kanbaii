@@ -78,6 +78,9 @@ program
       console.log(`  \x1b[32m◇\x1b[0m Server running on \x1b[1mhttp://localhost:${port}\x1b[0m`);
       console.log(`  \x1b[2mData: ${dataDir}\x1b[0m`);
       console.log('');
+      console.log('  \x1b[2mEnjoy KANBAII? Give it a star:\x1b[0m');
+      console.log('  \x1b[2mhttps://github.com/martinmsaavedra/kanbaii\x1b[0m');
+      console.log('');
 
       // Open browser (unless --no-open)
       if (opts.open !== false) {
