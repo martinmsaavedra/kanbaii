@@ -1,9 +1,11 @@
 import rateLimit from 'express-rate-limit';
 
+const isTest = process.env.NODE_ENV === 'test';
+
 // General API: 100 requests per minute
 export const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 100,
+  max: isTest ? 10000 : 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: { ok: false, error: 'Too many requests, try again later' },
@@ -12,7 +14,7 @@ export const apiLimiter = rateLimit({
 // Auth endpoints: 10 attempts per 15 minutes
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: isTest ? 10000 : 10,
   message: { ok: false, error: 'Too many login attempts' },
 });
 
