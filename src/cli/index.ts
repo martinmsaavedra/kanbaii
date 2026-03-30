@@ -5,8 +5,13 @@
 import { Command } from 'commander';
 import { printBanner, getVersion } from './banner';
 import { runDiagnostics, findClaudePath, isClaudeAuthenticated } from './doctor';
+import updateNotifier from 'update-notifier';
 import path from 'path';
 import fs from 'fs';
+
+// Check for updates (runs in background, shows banner on next run)
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf-8'));
+updateNotifier({ pkg, updateCheckInterval: 1000 * 60 * 60 * 4 }).notify();
 
 const program = new Command();
 
