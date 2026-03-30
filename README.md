@@ -169,6 +169,8 @@ kanbaii start --data-dir ~/my-data  # Custom data directory
 kanbaii doctor             # Diagnose: Claude CLI, Node, auth
 kanbaii status             # Is the server running?
 kanbaii init               # Initialize data directory
+kanbaii shortcut           # Create a desktop shortcut
+kanbaii shortcut --remove  # Remove the desktop shortcut
 ```
 
 ---

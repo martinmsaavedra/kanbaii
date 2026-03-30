@@ -47,6 +47,22 @@ export async function startPlanner(projectSlug: string, prompt: string): Promise
   if (!project.workingDir) throw new Error('Project has no working directory configured.');
   if (locked) throw new Error('Planner is already running.');
 
+  // Build board summary for context
+  const existingItems = workItemStore.listWorkItems(projectSlug);
+  let boardContext = '';
+  if (existingItems.length > 0) {
+    const summary = existingItems.map((wi) => {
+      const taskCounts: Record<string, number> = {};
+      for (const [col, tasks] of Object.entries(wi.columns)) {
+        taskCounts[col] = (tasks as any[]).length;
+      }
+      return { title: wi.title, slug: wi.slug, category: wi.category, status: wi.status, tasks: taskCounts };
+    });
+    boardContext = `\n\n## Current Board State\nThe project already has these work items. Do NOT duplicate them. You may reference them or suggest additions.\n\n\`\`\`json\n${JSON.stringify(summary, null, 2)}\n\`\`\``;
+  } else {
+    boardContext = '\n\n## Current Board State\nNo work items exist yet. This is a fresh project.';
+  }
+
   locked = true;
   plannerStore.start(projectSlug, prompt);
   setSourceOverride('planner');
@@ -129,7 +145,7 @@ export async function startPlanner(projectSlug: string, prompt: string): Promise
 
   try {
     await runner.run({
-      prompt: `USER REQUEST:\n\n${prompt}\n\nIdentify all work items, send item:discovered for each, then clarify and plan. Be fast and direct.`,
+      prompt: `USER REQUEST:\n\n${prompt}\n\nIdentify all work items, send item:discovered for each, then clarify and plan. Be fast and direct.${boardContext}`,
       workingDir: project.workingDir,
       model: 'opus',
       maxTurns: 100,

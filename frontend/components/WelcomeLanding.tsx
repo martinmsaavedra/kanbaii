@@ -140,7 +140,7 @@ function WhenToUseWhat() {
       </div>
 
       <div className="flex items-center justify-center gap-3 text-[11px] text-text-muted font-mono">
-        <span className="text-text-secondary">You organize in KANBAII</span>
+        <span className="text-text-secondary">You see the whole project</span>
         <ArrowRight size={10} className="text-accent/40" />
         <span className="text-text-secondary">KANBAII sends tasks to Claude Code</span>
         <ArrowRight size={10} className="text-accent/40" />
@@ -408,6 +408,144 @@ function TeamsExample() {
 }
 
 /* ═══════════════════════════════════════════
+   Feature Tour — Interactive tool explainer
+   ═══════════════════════════════════════════ */
+
+const PROJECT_TOUR_TABS = [
+  {
+    key: 'planner',
+    label: 'Planner',
+    icon: <Sparkles size={14} />,
+    oneLiner: 'Plan features with AI',
+    description: 'Describe what you need in plain language. AI decomposes it into work items with plans and tasks. Use it once for the initial plan, or come back later to add more — it knows what\'s already on the board.',
+  },
+  {
+    key: 'console',
+    label: 'Console',
+    icon: <Terminal size={14} />,
+    oneLiner: 'Talk to Claude with board access',
+    description: 'An embedded Claude Code session connected to your board. Ask it to add a feature, create tasks, explain your codebase, or work on something ad-hoc. Everything Claude does here can interact with your KANBAII project.',
+  },
+  {
+    key: 'work-items',
+    label: 'Work Items',
+    icon: <LayoutGrid size={14} />,
+    oneLiner: 'Your project kanban',
+    description: 'The main board. Work items flow through Planning, Active, Review, Done. Drag to reprioritize. Click into any item to see its tasks.',
+  },
+  {
+    key: 'teams',
+    label: 'Teams',
+    icon: <Users size={14} />,
+    oneLiner: 'Run multiple features in parallel',
+    description: 'Select several work items and launch them simultaneously. A coordinator assigns each to a worker. Watch all progress from one dashboard.',
+  },
+];
+
+const WORK_ITEM_TOUR_TABS = [
+  {
+    key: 'board',
+    label: 'Board',
+    icon: <LayoutGrid size={14} />,
+    oneLiner: 'Task kanban for this item',
+    description: 'Each work item has its own 5-column board: Backlog, Todo, In Progress, Review, Done. Organize tasks, set priorities, assign models.',
+  },
+  {
+    key: 'ralph',
+    label: 'Ralph',
+    icon: <Bot size={14} />,
+    oneLiner: 'AI executes this item\'s tasks',
+    description: 'Point Ralph at a work item and hit play. He reads the plan, picks up tasks from Todo, executes them sequentially, and moves completed work to Review. Pauses and asks you when blocked.',
+  },
+];
+
+function TourTabBar({ tabs, activeKey, onSelect }: {
+  tabs: typeof PROJECT_TOUR_TABS;
+  activeKey: string;
+  onSelect: (key: string) => void;
+}) {
+  return (
+    <div className="flex gap-0.5 border-b border-border/40">
+      {tabs.map((tab) => {
+        const isActive = activeKey === tab.key;
+        return (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => onSelect(tab.key)}
+            className={`flex flex-col items-center gap-[3px] px-4 pt-2 pb-2 text-[10px] font-mono uppercase tracking-[0.06em] relative transition-all duration-180 ease-out-expo
+                        ${isActive
+                          ? 'text-accent'
+                          : 'text-text-muted/50 hover:text-text-muted'}`}
+          >
+            <span className={isActive ? 'drop-shadow-[0_0_4px_var(--accent-glow)]' : ''}>{tab.icon}</span>
+            <span>{tab.label}</span>
+            {isActive && (
+              <span className="absolute -bottom-px left-[20%] right-[20%] h-[2px] rounded-t-sm bg-accent shadow-[0_0_8px_var(--accent-glow)]" />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TourPanel({ tabs, activeKey }: { tabs: typeof PROJECT_TOUR_TABS; activeKey: string }) {
+  const tab = tabs.find((t) => t.key === activeKey);
+  if (!tab) return null;
+
+  return (
+    <div className="px-4 py-3 animate-fade-in-up">
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="text-accent">{tab.icon}</span>
+        <span className="text-sm font-medium text-text">{tab.oneLiner}</span>
+      </div>
+      <p className="text-xs text-text-muted leading-relaxed">{tab.description}</p>
+    </div>
+  );
+}
+
+function FeatureTour() {
+  const [projectTab, setProjectTab] = useState('planner');
+  const [wiTab, setWiTab] = useState('board');
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Zone A — Project level */}
+      <div className="rounded-lg border border-border/50 bg-surface/30 overflow-hidden">
+        <div className="px-4 pt-3 pb-1.5">
+          <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-text-muted/40">
+            Project level
+          </span>
+        </div>
+        <TourTabBar tabs={PROJECT_TOUR_TABS} activeKey={projectTab} onSelect={setProjectTab} />
+        <TourPanel tabs={PROJECT_TOUR_TABS} activeKey={projectTab} />
+      </div>
+
+      {/* Connector */}
+      <div className="flex items-center justify-center">
+        <div className="flex flex-col items-center gap-1">
+          <ArrowDown size={12} className="text-text-muted/20" />
+          <span className="text-[10px] font-mono text-text-muted/30">click into a work item</span>
+          <ArrowDown size={12} className="text-text-muted/20" />
+        </div>
+      </div>
+
+      {/* Zone B — Work Item level */}
+      <div className="rounded-lg border border-accent/20 bg-accent/[0.02] overflow-hidden">
+        <div className="px-4 pt-3 pb-1.5">
+          <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-accent/40">
+            Inside a work item
+          </span>
+        </div>
+        <TourTabBar tabs={WORK_ITEM_TOUR_TABS} activeKey={wiTab} onSelect={setWiTab} />
+        <TourPanel tabs={WORK_ITEM_TOUR_TABS} activeKey={wiTab} />
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
    Main Landing
    ═══════════════════════════════════════════ */
 
@@ -424,10 +562,10 @@ export function WelcomeLanding() {
           </div>
           <div className="flex flex-col gap-1.5">
             <h1 className="text-[26px] font-semibold text-text tracking-tight">
-              The organization layer for Claude Code
+              Visual cockpit for Claude Code
             </h1>
             <p className="text-sm text-text-secondary leading-relaxed max-w-lg">
-              Claude Code is great at executing one task. KANBAII lets you see the whole project, plan the work, and let AI execute across many tasks at once.
+              Claude Code is the engine. KANBAII is the cockpit. Plan visually, track progress, and let AI execute — across many tasks at once.
             </p>
           </div>
         </div>
@@ -436,11 +574,22 @@ export function WelcomeLanding() {
         <Section
           icon={<Zap size={14} />}
           title="KANBAII + Claude Code"
-          subtitle="Not a replacement — the project layer Claude Code doesn't have"
+          subtitle="Not a replacement — the cockpit your engine doesn't have"
           accentColor="bg-accent/8 text-accent/60"
           defaultOpen
         >
           <WhenToUseWhat />
+        </Section>
+
+        {/* ─── Feature Tour ─── */}
+        <Section
+          icon={<ArrowDown size={14} />}
+          title="How it works — tool by tool"
+          subtitle="What each button does and when to use it"
+          accentColor="bg-accent/8 text-accent/60"
+          defaultOpen
+        >
+          <FeatureTour />
         </Section>
 
         {/* ─── Hierarchy + Kanban side by side ─── */}

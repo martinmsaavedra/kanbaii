@@ -26,6 +26,38 @@ program
   .action(async (opts) => {
     printBanner();
 
+    // Auto-rebuild dashboard if running from dev environment with stale build
+    const frontendDir = path.join(__dirname, '..', '..', 'frontend');
+    const dashboardIndex = path.join(__dirname, '..', '..', 'dashboard', 'index.html');
+    if (fs.existsSync(path.join(frontendDir, 'package.json'))) {
+      const dashboardTime = fs.existsSync(dashboardIndex)
+        ? fs.statSync(dashboardIndex).mtimeMs : 0;
+      const srcDirs = ['components', 'app', 'stores', 'hooks', 'lib', 'contexts'].map(d => path.join(frontendDir, d));
+      let needsRebuild = false;
+      for (const dir of srcDirs) {
+        if (!fs.existsSync(dir)) continue;
+        const files = fs.readdirSync(dir, { recursive: true }) as string[];
+        if (files.some(f => fs.statSync(path.join(dir, f)).mtimeMs > dashboardTime)) {
+          needsRebuild = true;
+          break;
+        }
+      }
+      if (needsRebuild) {
+        console.log('  \x1b[33m◇\x1b[0m Frontend changes detected, rebuilding dashboard...');
+        const { execSync } = require('child_process');
+        try {
+          const projectRoot = path.join(__dirname, '..', '..');
+          execSync('npm run build:frontend', { cwd: projectRoot, stdio: 'pipe' });
+          console.log('  \x1b[32m◇\x1b[0m Dashboard rebuilt successfully.');
+          console.log('');
+        } catch (err: any) {
+          console.log('  \x1b[31m✗\x1b[0m Dashboard rebuild failed. Using last build.');
+          console.log(`    ${err.message?.split('\n')[0] || 'Unknown error'}`);
+          console.log('');
+        }
+      }
+    }
+
     // Pre-flight: check claude exists AND is authenticated
     const claudePath = findClaudePath();
     if (!claudePath) {
@@ -203,6 +235,82 @@ program
     } else {
       console.log(`  \x1b[31m${failures.length} issue(s) found.\x1b[0m Fix them before starting.`);
     }
+  });
+
+// ── kanbaii shortcut ─────────────────────────────────────────────────────
+
+program
+  .command('shortcut')
+  .description('Create a desktop shortcut to launch KANBAII')
+  .option('-p, --port <port>', 'Port number', '5555')
+  .option('--remove', 'Remove the desktop shortcut')
+  .action((opts) => {
+    printBanner();
+
+    const os = require('os');
+    const desktop = path.join(os.homedir(), 'Desktop');
+
+    if (!fs.existsSync(desktop)) {
+      // Try common localized desktop paths
+      const alternatives = [
+        path.join(os.homedir(), 'Escritorio'),
+        path.join(os.homedir(), 'Bureau'),
+        path.join(os.homedir(), 'Schreibtisch'),
+      ];
+      const found = alternatives.find(d => fs.existsSync(d));
+      if (!found) {
+        console.log('  \x1b[31m✗\x1b[0m Could not find Desktop directory.');
+        process.exit(1);
+      }
+    }
+
+    const desktopPath = fs.existsSync(desktop) ? desktop
+      : [path.join(os.homedir(), 'Escritorio'), path.join(os.homedir(), 'Bureau'), path.join(os.homedir(), 'Schreibtisch')]
+        .find(d => fs.existsSync(d)) || desktop;
+
+    const platform = process.platform;
+    const port = opts.port;
+
+    if (platform === 'win32') {
+      const batPath = path.join(desktopPath, 'KANBAII.bat');
+      if (opts.remove) {
+        if (fs.existsSync(batPath)) { fs.unlinkSync(batPath); console.log('  \x1b[32m◇\x1b[0m Shortcut removed.'); }
+        else { console.log('  \x1b[2mNo shortcut found.\x1b[0m'); }
+        return;
+      }
+      const batContent = `@echo off\ntitle KANBAII\nkanbaii start -p ${port}\n`;
+      fs.writeFileSync(batPath, batContent, 'utf-8');
+      console.log(`  \x1b[32m◇\x1b[0m Created shortcut: ${batPath}`);
+
+    } else if (platform === 'darwin') {
+      const cmdPath = path.join(desktopPath, 'KANBAII.command');
+      if (opts.remove) {
+        if (fs.existsSync(cmdPath)) { fs.unlinkSync(cmdPath); console.log('  \x1b[32m◇\x1b[0m Shortcut removed.'); }
+        else { console.log('  \x1b[2mNo shortcut found.\x1b[0m'); }
+        return;
+      }
+      const cmdContent = `#!/bin/bash\nkanbaii start -p ${port}\n`;
+      fs.writeFileSync(cmdPath, cmdContent, { mode: 0o755 });
+      console.log(`  \x1b[32m◇\x1b[0m Created shortcut: ${cmdPath}`);
+
+    } else {
+      // Linux .desktop file
+      const desktopFile = path.join(desktopPath, 'kanbaii.desktop');
+      if (opts.remove) {
+        if (fs.existsSync(desktopFile)) { fs.unlinkSync(desktopFile); console.log('  \x1b[32m◇\x1b[0m Shortcut removed.'); }
+        else { console.log('  \x1b[2mNo shortcut found.\x1b[0m'); }
+        return;
+      }
+      const desktopContent = `[Desktop Entry]\nName=KANBAII\nExec=kanbaii start -p ${port}\nType=Application\nTerminal=true\nComment=AI-native kanban for software development\n`;
+      fs.writeFileSync(desktopFile, desktopContent, { mode: 0o755 });
+      console.log(`  \x1b[32m◇\x1b[0m Created shortcut: ${desktopFile}`);
+    }
+
+    console.log('');
+    console.log('  Double-click it to launch KANBAII.');
+    console.log('  It will start the server and open your browser.');
+    console.log('');
+    console.log(`  \x1b[2mTo remove: kanbaii shortcut --remove\x1b[0m`);
   });
 
 // ── kanbaii stop ─────────────────────────────────────────────────────────
