@@ -63,15 +63,20 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
     } catch {}
   }, []);
 
-  const runnableWIs = workItems.filter((wi) => wi.columns['todo']?.length > 0);
+  // Show work items that have ANY pending tasks (not done)
+  const countPendingTasks = (wi: typeof workItems[0]) =>
+    (wi.columns['backlog']?.length || 0) + (wi.columns['todo']?.length || 0) +
+    (wi.columns['in-progress']?.length || 0) + (wi.columns['review']?.length || 0);
+
+  const runnableWIs = workItems.filter((wi) => countPendingTasks(wi) > 0);
 
   const toggleWI = (slug: string) => {
     setSelectedWIs((s) => s.includes(slug) ? s.filter((x) => x !== slug) : [...s, slug]);
   };
 
-  const totalTodo = selectedWIs.reduce((sum, slug) => {
+  const totalPending = selectedWIs.reduce((sum, slug) => {
     const wi = workItems.find((w) => w.slug === slug);
-    return sum + (wi?.columns['todo']?.length || 0);
+    return sum + (wi ? countPendingTasks(wi) : 0);
   }, 0);
 
   const handleStart = async () => {
@@ -151,7 +156,7 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
             onClick={handleStart}
             disabled={selectedWIs.length === 0}
           >
-            <Play size={14} /> Start ({totalTodo} tasks)
+            <Play size={14} /> Start ({totalPending} tasks)
           </button>
         )}
       </div>
@@ -164,13 +169,13 @@ export function TeamsView({ projectSlug }: { projectSlug: string }) {
             <div className="text-xxs font-semibold text-text-muted uppercase tracking-[0.1em] font-mono mb-2">Work Items</div>
             <div className="flex flex-col gap-px">
               {runnableWIs.length === 0 ? (
-                <div className="text-text-muted text-data text-center py-6 font-mono opacity-40">No tasks in To Do</div>
+                <div className="text-text-muted text-data text-center py-6 font-mono opacity-40">No pending work items</div>
               ) : (
                 runnableWIs.map((wi) => (
                   <label key={wi.slug} className="flex items-center gap-2 py-[6px] px-2 rounded-sm text-xs text-text-secondary cursor-pointer transition-all duration-150 hover:bg-surface-hover">
                     <input type="checkbox" checked={selectedWIs.includes(wi.slug)} onChange={() => toggleWI(wi.slug)} disabled={teams.active} className="accent-accent w-3.5 h-3.5" />
                     <span className="flex-1 truncate">{wi.title}</span>
-                    <span className="text-xxs text-text-muted bg-pill px-1 py-0.5 rounded-xs font-mono">{wi.columns['todo']?.length || 0}</span>
+                    <span className="text-xxs text-text-muted bg-pill px-1 py-0.5 rounded-xs font-mono">{countPendingTasks(wi)}</span>
                   </label>
                 ))
               )}
