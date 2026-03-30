@@ -129,9 +129,10 @@ describe('Projects API', () => {
     const res = await request('DELETE', '/api/projects/bye');
     expect(res.status).toBe(200);
 
-    // Should not appear in list (soft deleted)
+    // Still in list but with status 'deleted' (frontend filters)
     const list = await request('GET', '/api/projects');
-    expect(list.body.data).toHaveLength(0);
+    expect(list.body.data).toHaveLength(1);
+    expect(list.body.data[0].status).toBe('deleted');
   });
 
   it('POST /api/projects — 400 on invalid input', async () => {

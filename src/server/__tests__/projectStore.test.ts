@@ -89,14 +89,17 @@ describe('ProjectStore', () => {
       expect(titles).toContain('Gamma');
     });
 
-    it('excludes deleted projects', () => {
+    it('includes deleted projects (frontend filters by status)', () => {
       projectStore.createProject({ title: 'Active' });
       projectStore.createProject({ title: 'To Delete' });
       projectStore.deleteProject('to-delete');
 
       const list = projectStore.listProjects();
-      expect(list).toHaveLength(1);
-      expect(list[0].title).toBe('Active');
+      expect(list).toHaveLength(2);
+      const deleted = list.find(p => p.title === 'To Delete');
+      expect(deleted?.status).toBe('deleted');
+      const active = list.find(p => p.title === 'Active');
+      expect(active?.status).toBe('active');
     });
   });
 
