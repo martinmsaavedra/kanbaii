@@ -35,13 +35,19 @@ function generateSalt(): string {
 
 // ─── JWT-like tokens (simple HMAC-based, no jsonwebtoken dependency) ───
 
+// Cache secret — avoids getSection('auth') on every sign/verify call
+let _cachedSecret: string | null = null;
+
 function getSecret(): string {
+  if (_cachedSecret) return _cachedSecret;
   const auth = getSection('auth');
   if (!auth.secret || auth.secret === 'kanbaii-default-secret-change-me') {
     const generated = crypto.randomBytes(32).toString('hex');
     updateSection('auth', { secret: generated });
+    _cachedSecret = generated;
     return generated;
   }
+  _cachedSecret = auth.secret;
   return auth.secret;
 }
 

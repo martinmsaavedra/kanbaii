@@ -90,7 +90,11 @@ function deepMerge(target: any, source: any): any {
   return result;
 }
 
+// In-memory cache — invalidated on write, avoids disk I/O + decrypt on every call
+let _settingsCache: AppSettings | null = null;
+
 export function getSettings(): AppSettings {
+  if (_settingsCache) return _settingsCache;
   try {
     if (fs.existsSync(SETTINGS_FILE)) {
       const saved = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
@@ -105,10 +109,17 @@ export function getSettings(): AppSettings {
       if (settings.auth.secret && isEncrypted(settings.auth.secret)) {
         try { settings.auth.secret = decrypt(settings.auth.secret); } catch {}
       }
+      _settingsCache = settings;
       return settings;
     }
   } catch {}
-  return { ...DEFAULTS };
+  _settingsCache = { ...DEFAULTS };
+  return _settingsCache;
+}
+
+/** Invalidate settings cache — called externally when settings file changes */
+export function invalidateSettingsCache(): void {
+  _settingsCache = null;
 }
 
 export function updateSettings(partial: Partial<AppSettings>): AppSettings {
@@ -128,6 +139,7 @@ export function updateSettings(partial: Partial<AppSettings>): AppSettings {
     toSave.auth.secret = encrypt(toSave.auth.secret);
   }
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(toSave, null, 2), 'utf-8');
+  _settingsCache = merged; // Update cache with decrypted values
   return merged;
 }
 

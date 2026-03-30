@@ -1,6 +1,6 @@
 {
   "name": "kanbaii",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Visual cockpit for Claude Code. Plan visually, track progress, let AI execute. Same engine, better cockpit.",
   "keywords": [
     "kanban",

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import { invalidateSettingsCache } from '../services/settingsService';
 
 // ─── Section 1: settingsService unit tests ────────────────────────────────────
 
@@ -12,6 +13,8 @@ function cleanup() {
   if (fs.existsSync(DATA_DIR)) fs.rmSync(DATA_DIR, { recursive: true, force: true });
   fs.mkdirSync(DATA_DIR, { recursive: true });
   if (fs.existsSync(SETTINGS_FILE)) fs.rmSync(SETTINGS_FILE, { force: true });
+  // Invalidate settings cache after cleanup so tests start fresh
+  invalidateSettingsCache();
 }
 
 describe('settingsService unit tests', () => {
@@ -150,6 +153,7 @@ function cleanRouteTestData() {
   if (fs.existsSync(DATA_DIR)) fs.rmSync(DATA_DIR, { recursive: true, force: true });
   fs.mkdirSync(DATA_DIR, { recursive: true });
   if (fs.existsSync(SETTINGS_FILE)) fs.rmSync(SETTINGS_FILE, { force: true });
+  invalidateSettingsCache();
 }
 
 beforeAll(async () => {

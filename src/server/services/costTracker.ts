@@ -56,21 +56,37 @@ export function estimateCost(model: string, inputTokens: number, outputTokens: n
   );
 }
 
-// ─── Persistence ───
+// ─── Persistence (cached — disk read once, deferred writes) ───
+
+let _usageCache: UsageData | null = null;
+let _writePending = false;
 
 function readUsage(): UsageData {
+  if (_usageCache) return _usageCache;
   try {
     if (fs.existsSync(USAGE_FILE)) {
-      return JSON.parse(fs.readFileSync(USAGE_FILE, 'utf-8'));
+      _usageCache = JSON.parse(fs.readFileSync(USAGE_FILE, 'utf-8'));
+      return _usageCache!;
     }
   } catch {}
-  return { executions: [] };
+  _usageCache = { executions: [] };
+  return _usageCache;
 }
 
 function writeUsage(data: UsageData): void {
-  const dir = path.dirname(USAGE_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(USAGE_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  _usageCache = data;
+  // Defer write — coalesce rapid writes into one disk op
+  if (!_writePending) {
+    _writePending = true;
+    setTimeout(() => {
+      _writePending = false;
+      try {
+        const dir = path.dirname(USAGE_FILE);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(USAGE_FILE, JSON.stringify(_usageCache, null, 2), 'utf-8');
+      } catch {}
+    }, 1000);
+  }
 }
 
 // ─── CRUD ───
