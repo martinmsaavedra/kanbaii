@@ -14,7 +14,7 @@ export interface McpConfig {
 }
 
 const DATA_DIR = path.resolve(process.env.KANBAII_DATA_DIR || path.join(process.cwd(), 'data', 'projects'));
-const KANBAII_ROOT = path.resolve(__dirname, '..', '..');
+const KANBAII_ROOT = path.resolve(__dirname, '..', '..', '..');
 const CONFIG_FILE = path.join(DATA_DIR, '..', '.mcp-config.json');
 
 function ensureFile(): void {
