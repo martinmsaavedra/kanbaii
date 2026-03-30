@@ -20,8 +20,8 @@ router.post('/register', (req: Request, res: Response) => {
   if (!username || !password) {
     return res.status(400).json({ ok: false, error: 'username and password required' });
   }
-  if (password.length < 4) {
-    return res.status(400).json({ ok: false, error: 'Password must be at least 4 characters' });
+  if (password.length < 8) {
+    return res.status(400).json({ ok: false, error: 'Password must be at least 8 characters' });
   }
   try {
     const result = authService.register(username, password);
