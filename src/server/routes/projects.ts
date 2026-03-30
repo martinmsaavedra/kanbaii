@@ -2,8 +2,12 @@ import { Router, Request, Response } from 'express';
 import * as projectStore from '../services/projectStore';
 import { emit } from '../lib/typedEmit';
 import { ZodError } from 'zod';
+import { validateSlugParam } from '../lib/validateSlug';
 
 const router = Router();
+
+// Validate :slug param for all routes in this router
+router.param('slug', (req, res, next) => validateSlugParam('slug')(req, res, next));
 
 // GET /api/projects
 router.get('/', (_req: Request, res: Response) => {
