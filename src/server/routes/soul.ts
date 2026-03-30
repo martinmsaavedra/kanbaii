@@ -74,17 +74,25 @@ router.get('/logs', (req: Request, res: Response) => {
 
 // GET /api/projects/:slug/soul/logs/:date
 router.get('/logs/:date', (req: Request, res: Response) => {
-  const log = soulStore.getDailyLog(req.params.slug, req.params.date);
-  if (!log) return res.status(404).json({ ok: false, error: 'Log not found' });
-  res.json({ ok: true, data: log });
+  try {
+    const log = soulStore.getDailyLog(req.params.slug, req.params.date);
+    if (!log) return res.status(404).json({ ok: false, error: 'Log not found' });
+    res.json({ ok: true, data: log });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: (err as Error).message });
+  }
 });
 
 // POST /api/projects/:slug/soul/logs
 router.post('/logs', (req: Request, res: Response) => {
   const { entry, date } = req.body;
   if (!entry) return res.status(400).json({ ok: false, error: 'entry required' });
-  soulStore.appendDailyLog(req.params.slug, entry, date);
-  res.json({ ok: true });
+  try {
+    soulStore.appendDailyLog(req.params.slug, entry, date);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: (err as Error).message });
+  }
 });
 
 // ─── Config ───
