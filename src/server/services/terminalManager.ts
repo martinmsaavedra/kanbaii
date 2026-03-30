@@ -1,4 +1,5 @@
 import { getIO } from '../lib/typedEmit';
+import { generateMcpConfigForClaude } from './mcpConfig';
 
 let pty: any = null;
 try { pty = require('node-pty'); } catch { console.warn('[terminal] node-pty not available'); }
@@ -39,7 +40,9 @@ export function spawnPty(projectSlug: string, workingDir: string, opts?: { model
   const shell = isWindows ? 'cmd.exe' : '/bin/bash';
   const validModels = ['opus', 'sonnet', 'haiku'];
   const model = opts?.model && validModels.includes(opts.model) ? opts.model : undefined;
-  const claudeCmd = `claude${model ? ` --model ${model}` : ''}`;
+  const mcpConfigPath = generateMcpConfigForClaude(false);
+  const mcpFlag = mcpConfigPath ? ` --mcp-config "${mcpConfigPath}"` : '';
+  const claudeCmd = `claude${model ? ` --model ${model}` : ''}${mcpFlag}`;
   const shellArgs = isWindows ? ['/c', claudeCmd] : ['-c', claudeCmd];
 
   const cleanEnv = { ...process.env };
